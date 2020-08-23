@@ -89,7 +89,7 @@ def assemble_fragments(
     stream: Optional[StringIO],
     fragment_name: str,
     fragments: Dict[str, Any],
-        fragment_name_stack: Optional[List[str]] = None,
+    fragment_name_stack: Optional[List[str]] = None,
     indent="",
     fragment_indent="",
 ):
