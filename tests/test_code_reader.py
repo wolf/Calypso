@@ -70,6 +70,13 @@ def test_indentation_is_preserved():
     assert code_files["generated_output"] == golden_record
 
 
+def test_newlines_are_preserved():
+    code_files = get_code_files(Path("tests/data/test-root-ends-with-the-right-number-of-newlines.w"))
+    with open("tests/data/test-root-ends-with-the-right-number-of-newlines.golden-record", "r") as f:
+        golden_record = f.read()
+    assert code_files["generated_output"] == golden_record
+
+
 def test_include_files():
     code_files = get_code_files(Path("tests/data/test-include-files.w"))
     with open("tests/data/test-include-files.golden-record", "r") as f:

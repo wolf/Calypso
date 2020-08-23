@@ -48,7 +48,9 @@ def split_source_file_into_code_sections(file: Path) -> Dict[str, str]:
         if code_section is not None:
             if code_section.name in code_sections:
                 code_sections[code_section.name] += "\n"
-            code_sections[code_section.name] += code_section.code.rstrip("\r\n")
+            elif code_section.code.endswith("\n"):
+                code_section.code = code_section.code[:-1]
+            code_sections[code_section.name] += code_section.code
             code_section = None
 
     def scan_file(file: Path):
@@ -109,7 +111,7 @@ def assemble_fragments(
         raise NoSuchCodeSectionError(name)
     for fragment in fragment_dict[name]:
         if isinstance(fragment, str):
-            needs_indent = (len(name_stack) > 2) and result.endswith("\n")
+            needs_indent = result.endswith("\n")
             for line in fragment.splitlines(keepends=True):
                 if needs_indent:
                     result += indent
@@ -123,11 +125,8 @@ def assemble_fragments(
 
 def build_output_files(fragment_dict, roots):
     output_files = {}
-    for fragment_name in roots:
-        fragment = assemble_fragments("", fragment_name, fragment_dict)
-        if not fragment.endswith("\r\n"):
-            fragment += "\n"
-        output_files[fragment_name] = fragment
+    for name in roots:
+        output_files[name] = assemble_fragments("", name, fragment_dict).rstrip("\r\n") + "\n"
     return output_files
 
 
