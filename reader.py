@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 import re
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 
 
 @dataclass
@@ -88,8 +88,8 @@ def split_code_blocks_into_fragments(code_block_dict: Dict[str, str]):
 def assemble_fragments(
     stream: Optional[StringIO],
     fragment_name: str,
-    fragment_dict: Dict[str, Any],
-    fragment_name_stack=None,
+    fragments: Dict[str, Any],
+        fragment_name_stack: Optional[List[str]] = None,
     indent="",
     fragment_indent="",
 ):
@@ -98,9 +98,9 @@ def assemble_fragments(
     if fragment_name in fragment_name_stack:
         raise CodeBlockRecursionError(fragment_name)
     fragment_name_stack.append(fragment_name)
-    if fragment_name not in fragment_dict:
+    if fragment_name not in fragments:
         raise NoSuchCodeBlockError(fragment_name)
-    for fragment in fragment_dict[fragment_name]:
+    for fragment in fragments[fragment_name]:
         if isinstance(fragment, str):
             actual_indent = indent
             for line in fragment.splitlines(keepends=True):
@@ -108,7 +108,7 @@ def assemble_fragments(
                 actual_indent = indent + fragment_indent
         elif isinstance(fragment, CodeFragmentReference):
             assemble_fragments(
-                stream, fragment.name, fragment_dict, fragment_name_stack, indent, fragment.indent,
+                stream, fragment.name, fragments, fragment_name_stack, indent, fragment.indent,
             )
     fragment_name_stack.pop()
 
