@@ -32,11 +32,15 @@ class NoSuchCodeBlockError(KeyError):
 
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
 CODE_BLOCK_REFERENCE = re.compile(r"(?:\n([ \t]+))?(<<(.*)>>)")
-DOCUMENTATION_START_PATTERN = re.compile(r"^@$")
+INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
+DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 
 
 def split_source_file_into_code_blocks(file: Path):
     """..."""
+
+    code_blocks = defaultdict(str)
+    code_block = None
 
     def close_block():
         nonlocal code_block
@@ -46,17 +50,22 @@ def split_source_file_into_code_blocks(file: Path):
             code_blocks[code_block.name] += code_block.code.rstrip("\r\n")
             code_block = None
 
-    code_blocks = defaultdict(str)
-    code_block = None
-    with open(file, "r") as f:
-        for line in f:
-            if (match := CODE_BLOCK_START_PATTERN.match(line)) is not None:
-                close_block()
-                code_block = CodeBlock(match.group(1))
-            elif DOCUMENTATION_START_PATTERN.match(line):
-                close_block()
-            elif code_block is not None:
-                code_block.code += line
+    def scan_file(file):
+        nonlocal code_block
+        with open(file, "r") as f:
+            for line in f:
+                if match := CODE_BLOCK_START_PATTERN.match(line):
+                    close_block()
+                    code_block = CodeBlock(match.group(1))
+                elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
+                    close_block()
+                elif (match := INCLUDE_STATEMENT_PATTERN.match(line)) and not code_block:
+                    scan_file(match.group(1))
+                elif code_block:
+                    code_block.code += line
+            close_block()
+
+    scan_file(file)
     return code_blocks
 
 
