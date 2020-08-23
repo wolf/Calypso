@@ -26,8 +26,12 @@ class CodeBlockRecursionError(RuntimeError):
     pass
 
 
+class NoSuchCodeBlockError(KeyError):
+    pass
+
+
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
-CODE_BLOCK_REFERENCE = re.compile(r"(?:\n(\s+))?(<<(.*)>>)")
+CODE_BLOCK_REFERENCE = re.compile(r"(?:\n([ \t]+))?(<<(.*)>>)")
 DOCUMENTATION_START_PATTERN = re.compile(r"^@$")
 
 
@@ -92,8 +96,10 @@ def assemble_fragments(
     if fragment_name_stack is None:
         fragment_name_stack = []
     if fragment_name in fragment_name_stack:
-        raise CodeBlockRecursionError()
+        raise CodeBlockRecursionError(fragment_name)
     fragment_name_stack.append(fragment_name)
+    if fragment_name not in fragment_dict:
+        raise NoSuchCodeBlockError(fragment_name)
     for fragment in fragment_dict[fragment_name]:
         if isinstance(fragment, str):
             actual_indent = indent
