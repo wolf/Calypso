@@ -46,10 +46,10 @@ def split_source_file_into_code_sections(file: Path) -> Dict[str, str]:
     def close_section():
         nonlocal code_section
         if code_section is not None:
+            if code_section.code.endswith("\n"):
+                code_section.code = code_section.code[:-1]
             if code_section.name in code_sections:
                 code_sections[code_section.name] += "\n"
-            elif code_section.code.endswith("\n"):
-                code_section.code = code_section.code[:-1]
             code_sections[code_section.name] += code_section.code
             code_section = None
 
@@ -59,7 +59,7 @@ def split_source_file_into_code_sections(file: Path) -> Dict[str, str]:
             for line in f:
                 if match := CODE_BLOCK_START_PATTERN.match(line):
                     close_section()
-                    code_section = CodeSection(match.group(1))
+                    code_section = CodeSection(match.group(1).strip())
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_section()
                 elif (match := INCLUDE_STATEMENT_PATTERN.match(line)) and not code_section:
@@ -83,7 +83,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
         fragment_list = []
         plain_code_start = 0
         for match in CODE_BLOCK_REFERENCE.finditer(code_section):
-            name = match.group(3)
+            name = match.group(3).strip()
             indent = match.group(1) or ""
             plain_code = code_section[plain_code_start : match.start(2)]
             plain_code_start = match.end(2)

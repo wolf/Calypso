@@ -42,6 +42,13 @@ def test_multiple_root_sections():
     assert code_files["generated_output_C"] == golden_record
 
 
+def test_same_named_sections_concatenate():
+    code_files = get_code_files(Path("tests/data/test-same-named-sections-concatenate.w"))
+    with open("tests/data/test-same-named-sections-concatenate.golden-record", "r") as f:
+        golden_record = f.read()
+    assert code_files["generated_output"] == golden_record
+
+
 def test_doc_is_ignored():
     code_files = get_code_files(Path("tests/data/test-doc-is-ignored.w"))
     with open("tests/data/test-doc-is-ignored.golden-record", "r") as f:
@@ -52,6 +59,13 @@ def test_doc_is_ignored():
 def test_sections_can_include_sections():
     code_files = get_code_files(Path("tests/data/test-sections-can-include-sections.w"))
     with open("tests/data/test-sections-can-include-sections.golden-record", "r") as f:
+        golden_record = f.read()
+    assert code_files["generated_output"] == golden_record
+
+
+def test_section_names_ignore_surrounding_whitespace():
+    code_files = get_code_files(Path("tests/data/test-section-names-ignore-surrounding-whitespace.w"))
+    with open("tests/data/test-section-names-ignore-surrounding-whitespace.golden-record", "r") as f:
         golden_record = f.read()
     assert code_files["generated_output"] == golden_record
 
@@ -70,9 +84,16 @@ def test_indentation_is_preserved():
     assert code_files["generated_output"] == golden_record
 
 
-def test_newlines_are_preserved():
+def test_newlines_are_trimmed_at_eof():
     code_files = get_code_files(Path("tests/data/test-root-ends-with-the-right-number-of-newlines.w"))
     with open("tests/data/test-root-ends-with-the-right-number-of-newlines.golden-record", "r") as f:
+        golden_record = f.read()
+    assert code_files["generated_output"] == golden_record
+
+
+def test_newlines_are_preserved_between_section_pieces():
+    code_files = get_code_files(Path("tests/data/test-newlines-are-preserved-between-section-pieces.w"))
+    with open("tests/data/test-newlines-are-preserved-between-section-pieces.golden-record", "r") as f:
         golden_record = f.read()
     assert code_files["generated_output"] == golden_record
 
