@@ -13,7 +13,7 @@ class CodeFragmentReference:
 
 
 @dataclass
-class CodeBlock:
+class CodeSection:
     name: str
     code: str
 
@@ -22,11 +22,11 @@ class CodeBlock:
         self.code = ""
 
 
-class CodeBlockRecursionError(RuntimeError):
+class CodeSectionRecursionError(RuntimeError):
     pass
 
 
-class NoSuchCodeBlockError(KeyError):
+class NoSuchCodeSectionError(KeyError):
     pass
 
 
@@ -36,62 +36,60 @@ INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 
 
-def split_source_file_into_code_blocks(file: Path):
-    """..."""
+def split_source_file_into_code_sections(file: Path) -> Dict[str, str]:
+    code_section: Optional[CodeSection] = None
+    code_sections: Dict[str, str] = defaultdict(str)
 
-    code_blocks = defaultdict(str)
-    code_block = None
+    def close_section():
+        nonlocal code_section
+        if code_section is not None:
+            if code_section.name in code_sections:
+                code_sections[code_section.name] += "\n"
+            code_sections[code_section.name] += code_section.code.rstrip("\r\n")
+            code_section = None
 
-    def close_block():
-        nonlocal code_block
-        if code_block is not None:
-            if code_block.name in code_blocks:
-                code_blocks[code_block.name] += "\n"
-            code_blocks[code_block.name] += code_block.code.rstrip("\r\n")
-            code_block = None
-
-    def scan_file(file):
-        nonlocal code_block
+    def scan_file(file: Path):
+        nonlocal code_section
         with open(file, "r") as f:
             for line in f:
                 if match := CODE_BLOCK_START_PATTERN.match(line):
-                    close_block()
-                    code_block = CodeBlock(match.group(1))
+                    close_section()
+                    code_section = CodeSection(match.group(1))
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
-                    close_block()
-                elif (match := INCLUDE_STATEMENT_PATTERN.match(line)) and not code_block:
-                    scan_file(match.group(1))
-                elif code_block:
-                    code_block.code += line
-            close_block()
+                    close_section()
+                elif (match := INCLUDE_STATEMENT_PATTERN.match(line)) and not code_section:
+                    scan_file(Path(match.group(1)))
+                elif code_section:
+                    code_section.code += line
+            close_section()
 
     scan_file(file)
-    return code_blocks
+    return code_sections
 
 
-def split_code_blocks_into_fragments(code_block_dict: Dict[str, str]):
+def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
     fragment_dict = {}
-    all_block_names = set()
+    all_section_names = set()
     nonroots = set()
-    for code_block_name, code_block in code_block_dict.items():
-        all_block_names.add(code_block_name)
+    for code_section_name, code_section in code_section_dict.items():
+        all_section_names.add(code_section_name)
         fragment_list = []
         plain_code_start = 0
-        for match in CODE_BLOCK_REFERENCE.finditer(code_block):
+        for match in CODE_BLOCK_REFERENCE.finditer(code_section):
             name = match.group(3)
             indent = match.group(1) or ""
-            plain_code = code_block[plain_code_start : match.start(2)]
+            plain_code = code_section[plain_code_start : match.start(2)]
             plain_code_start = match.end(2)
             if plain_code:
                 fragment_list.append(plain_code)
             fragment_list.append(CodeFragmentReference(name, indent))
             nonroots.add(name)
-        if plain_code_start < len(code_block):
-            fragment_list.append(code_block[plain_code_start:])
-        fragment_dict[code_block_name] = fragment_list
-    if all_block_names == nonroots:
-        raise CodeBlockRecursionError()
-    return fragment_dict, all_block_names - nonroots
+        if plain_code_start < len(code_section):
+            fragment_list.append(code_section[plain_code_start:])
+        fragment_dict[code_section_name] = fragment_list
+    if all_section_names == nonroots:
+        raise CodeSectionRecursionError()
+    return fragment_dict, (all_section_names - nonroots)
 
 
 def assemble_fragments(
@@ -99,16 +97,16 @@ def assemble_fragments(
     fragment_name: str,
     fragments: Dict[str, Any],
     fragment_name_stack: Optional[List[str]] = None,
-    indent="",
-    fragment_indent="",
+    indent: str = "",
+    fragment_indent: str = "",
 ):
     if fragment_name_stack is None:
         fragment_name_stack = []
     if fragment_name in fragment_name_stack:
-        raise CodeBlockRecursionError(fragment_name)
+        raise CodeSectionRecursionError(fragment_name)
     fragment_name_stack.append(fragment_name)
     if fragment_name not in fragments:
-        raise NoSuchCodeBlockError(fragment_name)
+        raise NoSuchCodeSectionError(fragment_name)
     for fragment in fragments[fragment_name]:
         if isinstance(fragment, str):
             actual_indent = indent
@@ -132,6 +130,6 @@ def build_output_files(fragment_dict, roots):
 
 
 def get_code_files(file: Path):
-    code_blocks = split_source_file_into_code_blocks(file)
-    code_fragments, roots = split_code_blocks_into_fragments(code_blocks)
+    code_sections = split_source_file_into_code_sections(file)
+    code_fragments, roots = split_code_sections_into_fragments(code_sections)
     return build_output_files(code_fragments, roots)

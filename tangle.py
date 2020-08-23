@@ -1,5 +1,5 @@
-from reader import get_code_files
-from writer import write_code_files
+from code_reader import get_code_files
+from code_writer import write_code_files
 
 import click
 
