@@ -1,5 +1,7 @@
-from code_reader import get_code_files
-from code_writer import write_code_files
+from pathlib import Path
+
+from code_reader.code_reader import get_code_files
+from code_writer.code_writer import write_code_files
 
 import click
 
@@ -10,7 +12,7 @@ import click
 )
 def tangle(file_paths):
     for file_path in file_paths:
-        code_files = get_code_files(file_path)
+        code_files = get_code_files(Path(file_path))
         write_code_files(code_files)
 
 

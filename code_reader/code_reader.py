@@ -30,6 +30,10 @@ class NoSuchCodeSectionError(KeyError):
     pass
 
 
+class NoRootCodeSectionsFound(RuntimeError):
+    pass
+
+
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
 CODE_BLOCK_REFERENCE = re.compile(r"(?:\n([ \t]+))?(<<(.*)>>)")
 INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
@@ -58,7 +62,9 @@ def split_source_file_into_code_sections(file: Path) -> Dict[str, str]:
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_section()
                 elif (match := INCLUDE_STATEMENT_PATTERN.match(line)) and not code_section:
-                    scan_file(Path(match.group(1)))
+                    relative_path = Path(match.group(1))
+                    current_working_directory = file.parent
+                    scan_file(current_working_directory / relative_path)
                 elif code_section:
                     code_section.code += line
             close_section()
@@ -88,7 +94,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
             fragment_list.append(code_section[plain_code_start:])
         fragment_dict[code_section_name] = fragment_list
     if all_section_names == nonroots:
-        raise CodeSectionRecursionError()
+        raise NoRootCodeSectionsFound()
     return fragment_dict, (all_section_names - nonroots)
 
 
@@ -97,8 +103,7 @@ def assemble_fragments(
     fragment_name: str,
     fragments: Dict[str, Any],
     fragment_name_stack: Optional[List[str]] = None,
-    indent: str = "",
-    fragment_indent: str = "",
+    indent: str = ""
 ):
     if fragment_name_stack is None:
         fragment_name_stack = []
@@ -109,13 +114,11 @@ def assemble_fragments(
         raise NoSuchCodeSectionError(fragment_name)
     for fragment in fragments[fragment_name]:
         if isinstance(fragment, str):
-            actual_indent = indent
             for line in fragment.splitlines(keepends=True):
-                stream.write(actual_indent + line)
-                actual_indent = indent + fragment_indent
+                stream.write(indent + line)
         elif isinstance(fragment, CodeFragmentReference):
             assemble_fragments(
-                stream, fragment.name, fragments, fragment_name_stack, indent, fragment.indent,
+                stream, fragment.name, fragments, fragment_name_stack, indent + fragment.indent
             )
     fragment_name_stack.pop()
 
@@ -125,6 +128,8 @@ def build_output_files(fragment_dict, roots):
     for fragment_name in roots:
         stream = StringIO("")
         assemble_fragments(stream, fragment_name, fragment_dict)
+        if not stream.getvalue().endswith("\r\n"):
+            stream.write("\n")
         output_files[fragment_name] = stream.getvalue()
     return output_files
 
