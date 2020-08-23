@@ -102,12 +102,7 @@ def assemble_fragments(
                 actual_indent = indent + fragment_indent
         elif isinstance(fragment, CodeFragmentReference):
             assemble_fragments(
-                stream,
-                fragment.name,
-                fragment_dict,
-                fragment_name_stack,
-                indent,
-                fragment.indent,
+                stream, fragment.name, fragment_dict, fragment_name_stack, indent, fragment.indent,
             )
     fragment_name_stack.pop()
 

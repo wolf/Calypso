@@ -6,11 +6,7 @@ import click
 
 @click.command()
 @click.argument(
-    "file_paths",
-    type=click.Path(
-        exists=True, file_okay=True, dir_okay=False, writable=False, readable=True
-    ),
-    nargs=-1,
+    "file_paths", type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True), nargs=-1,
 )
 def tangle(file_paths):
     for file_path in file_paths:
