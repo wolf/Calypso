@@ -1,6 +1,5 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from io import StringIO
 from pathlib import Path
 import re
 from typing import Dict, Optional, Any, List
@@ -35,7 +34,7 @@ class NoRootCodeSectionsFound(RuntimeError):
 
 
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
-CODE_BLOCK_REFERENCE = re.compile(r"(?:\n([ \t]+))?(<<(.*)>>)")
+CODE_BLOCK_REFERENCE = re.compile(r"(?:\n?([ \t]*))?(<<(.*)>>)")
 INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 
@@ -99,38 +98,36 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
 
 
 def assemble_fragments(
-    stream: Optional[StringIO],
-    fragment_name: str,
-    fragments: Dict[str, Any],
-    fragment_name_stack: Optional[List[str]] = None,
-    indent: str = ""
-):
-    if fragment_name_stack is None:
-        fragment_name_stack = []
-    if fragment_name in fragment_name_stack:
-        raise CodeSectionRecursionError(fragment_name)
-    fragment_name_stack.append(fragment_name)
-    if fragment_name not in fragments:
-        raise NoSuchCodeSectionError(fragment_name)
-    for fragment in fragments[fragment_name]:
+    result: str, name: str, fragment_dict: Dict[str, Any], name_stack: Optional[List[str]] = None, indent: str = ""
+) -> str:
+    if name_stack is None:
+        name_stack = []
+    if name in name_stack:
+        raise CodeSectionRecursionError(name)
+    name_stack.append(name)
+    if name not in fragment_dict:
+        raise NoSuchCodeSectionError(name)
+    for fragment in fragment_dict[name]:
         if isinstance(fragment, str):
+            needs_indent = (len(name_stack) > 2) and result.endswith("\n")
             for line in fragment.splitlines(keepends=True):
-                stream.write(indent + line)
+                if needs_indent:
+                    result += indent
+                result += line
+                needs_indent = True
         elif isinstance(fragment, CodeFragmentReference):
-            assemble_fragments(
-                stream, fragment.name, fragments, fragment_name_stack, indent + fragment.indent
-            )
-    fragment_name_stack.pop()
+            result = assemble_fragments(result, fragment.name, fragment_dict, name_stack, indent + fragment.indent)
+    name_stack.pop()
+    return result
 
 
 def build_output_files(fragment_dict, roots):
     output_files = {}
     for fragment_name in roots:
-        stream = StringIO("")
-        assemble_fragments(stream, fragment_name, fragment_dict)
-        if not stream.getvalue().endswith("\r\n"):
-            stream.write("\n")
-        output_files[fragment_name] = stream.getvalue()
+        fragment = assemble_fragments("", fragment_name, fragment_dict)
+        if not fragment.endswith("\r\n"):
+            fragment += "\n"
+        output_files[fragment_name] = fragment
     return output_files
 
 

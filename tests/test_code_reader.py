@@ -56,7 +56,6 @@ def test_sections_can_include_sections():
     assert code_files["generated_output"] == golden_record
 
 
-
 def test_inline_substitution():
     code_files = get_code_files(Path("tests/data/test-inline-substitution.w"))
     with open("tests/data/test-inline-substitution.golden-record", "r") as f:

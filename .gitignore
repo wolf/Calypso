@@ -115,3 +115,5 @@ tags
 
 *.out
 .venv/
+*.egg-info/
+generated_output
