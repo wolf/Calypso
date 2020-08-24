@@ -46,7 +46,7 @@ class FileIncludeRecursionError(CodeReaderError):
 
 
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
-CODE_BLOCK_REFERENCE = re.compile(r"(?:\n?([ \t]*))?(<<(.*)>>)")
+CODE_BLOCK_REFERENCE = re.compile(r"(?:\n?([ \t]*))?(<<(.*?)>>)")
 INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 

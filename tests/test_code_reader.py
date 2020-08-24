@@ -14,8 +14,7 @@ def read_golden_record(path: str):
 
 def test_get_roots():
     code_files = get_code_files(Path("tests/data/test-get-roots.w"))
-    golden_record = read_golden_record("tests/data/test-get-roots")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-get-roots")
 
 
 def test_section_boundaries():
@@ -36,33 +35,24 @@ def test_section_boundaries():
 
 def test_multiple_root_sections():
     code_files = get_code_files(Path("tests/data/test-multiple-root-sections.w"))
-
-    golden_record = read_golden_record("tests/data/test-multiple-root-sections-A")
-    assert code_files["generated_output_A"] == golden_record
-
-    golden_record = read_golden_record("tests/data/test-multiple-root-sections-B")
-    assert code_files["generated_output_B"] == golden_record
-
-    golden_record = read_golden_record("tests/data/test-multiple-root-sections-C")
-    assert code_files["generated_output_C"] == golden_record
+    assert code_files["generated_output_A"] == read_golden_record("tests/data/test-multiple-root-sections-A")
+    assert code_files["generated_output_B"] == read_golden_record("tests/data/test-multiple-root-sections-B")
+    assert code_files["generated_output_C"] == read_golden_record("tests/data/test-multiple-root-sections-C")
 
 
 def test_same_named_sections_concatenate():
     code_files = get_code_files(Path("tests/data/test-same-named-sections-concatenate.w"))
-    golden_record = read_golden_record("tests/data/test-same-named-sections-concatenate")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-same-named-sections-concatenate")
 
 
 def test_doc_is_ignored():
     code_files = get_code_files(Path("tests/data/test-doc-is-ignored.w"))
-    golden_record = read_golden_record("tests/data/test-doc-is-ignored")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-doc-is-ignored")
 
 
 def test_sections_can_include_sections():
     code_files = get_code_files(Path("tests/data/test-sections-can-include-sections.w"))
-    golden_record = read_golden_record("tests/data/test-sections-can-include-sections")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-sections-can-include-sections")
 
 
 def test_section_names_ignore_surrounding_whitespace():
@@ -73,38 +63,37 @@ def test_section_names_ignore_surrounding_whitespace():
 
 def test_inline_substitution():
     code_files = get_code_files(Path("tests/data/test-inline-substitution.w"))
-    golden_record = read_golden_record("tests/data/test-inline-substitution")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-inline-substitution")
+
+
+def test_consecutive_section_includes():
+    code_files = get_code_files(Path("tests/data/test-consecutive-section-includes.w"))
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-consecutive-section-includes")
 
 
 def test_indentation_is_preserved():
     code_files = get_code_files(Path("tests/data/test-indentation-is-preserved.w"))
-    golden_record = read_golden_record("tests/data/test-indentation-is-preserved")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-indentation-is-preserved")
 
 
 def test_newlines_are_trimmed_at_eof():
     code_files = get_code_files(Path("tests/data/test-root-ends-with-the-right-number-of-newlines.w"))
-    golden_record = read_golden_record("tests/data/test-root-ends-with-the-right-number-of-newlines")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-root-ends-with-the-right-number-of-newlines")
 
 
 def test_newlines_are_preserved_between_section_pieces():
     code_files = get_code_files(Path("tests/data/test-newlines-are-preserved-between-section-pieces.w"))
-    golden_record = read_golden_record("tests/data/test-newlines-are-preserved-between-section-pieces")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-newlines-are-preserved-between-section-pieces")
 
 
 def test_include_files():
     code_files = get_code_files(Path("tests/data/test-include-files.w"))
-    golden_record = read_golden_record("tests/data/test-include-files")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-nested-include-files")
 
 
 def test_nested_include_files():
     code_files = get_code_files(Path("tests/data/test-nested-include-files.w"))
-    golden_record = read_golden_record("tests/data/test-nested-include-files")
-    assert code_files["generated_output"] == golden_record
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-nested-include-files")
 
 
 def test_recursive_include_files_fail():
