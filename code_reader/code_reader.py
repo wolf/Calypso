@@ -118,7 +118,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
     return fragment_dict, (all_section_names - nonroots)
 
 
-def assemble_fragments(
+def coalesce_fragments(
     result: str, name: str, fragment_dict: Dict[str, Any], name_stack: Optional[List[str]] = None, indent: str = ""
 ) -> str:
     if name_stack is None:
@@ -137,7 +137,7 @@ def assemble_fragments(
                 result += line
                 needs_indent = True
         elif isinstance(fragment, CodeFragmentReference):
-            result = assemble_fragments(result, fragment.name, fragment_dict, name_stack, indent + fragment.indent)
+            result = coalesce_fragments(result, fragment.name, fragment_dict, name_stack, indent + fragment.indent)
     name_stack.pop()
     return result
 
@@ -145,7 +145,7 @@ def assemble_fragments(
 def build_output_files(fragment_dict, roots):
     output_files = {}
     for name in roots:
-        output_files[name] = assemble_fragments("", name, fragment_dict).rstrip("\r\n") + "\n"
+        output_files[name] = coalesce_fragments("", name, fragment_dict).rstrip("\r\n") + "\n"
     return output_files
 
 
