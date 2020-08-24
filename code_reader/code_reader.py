@@ -21,15 +21,26 @@ class CodeSection:
         self.code = ""
 
 
-class CodeSectionRecursionError(RuntimeError):
+class CodeReaderError(RuntimeError):
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        print(f"{type(self)}: {self.message}")
+
+class CodeSectionRecursionError(CodeReaderError):
     pass
 
 
-class NoSuchCodeSectionError(KeyError):
+class NoSuchCodeSectionError(CodeReaderError):
     pass
 
 
-class NoRootCodeSectionsFound(RuntimeError):
+class NoRootCodeSectionsFoundError(CodeReaderError):
+    pass
+
+
+class FileIncludeRecursionError(CodeReaderError):
     pass
 
 
@@ -95,7 +106,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
             fragment_list.append(code_section[plain_code_start:])
         fragment_dict[code_section_name] = fragment_list
     if all_section_names == nonroots:
-        raise NoRootCodeSectionsFound()
+        raise NoRootCodeSectionsFoundError("no root code sections found")
     return fragment_dict, (all_section_names - nonroots)
 
 
@@ -105,10 +116,10 @@ def assemble_fragments(
     if name_stack is None:
         name_stack = []
     if name in name_stack:
-        raise CodeSectionRecursionError(name)
+        raise CodeSectionRecursionError(f"code section \"{name}\" recursively includes itself")
     name_stack.append(name)
     if name not in fragment_dict:
-        raise NoSuchCodeSectionError(name)
+        raise NoSuchCodeSectionError(f"code section \"{name}\" not found")
     for fragment in fragment_dict[name]:
         if isinstance(fragment, str):
             needs_indent = result.endswith("\n")
