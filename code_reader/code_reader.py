@@ -50,7 +50,7 @@ INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 
 
-def split_source_file_into_code_sections(file: Path) -> Dict[str, str]:
+def coalesce_code_sections(file: Path) -> Dict[str, str]:
     code_section: Optional[CodeSection] = None
     code_sections: Dict[str, str] = defaultdict(str)
 
@@ -142,6 +142,6 @@ def build_output_files(fragment_dict, roots):
 
 
 def get_code_files(file: Path):
-    code_sections = split_source_file_into_code_sections(file)
+    code_sections = coalesce_code_sections(file)
     code_fragments, roots = split_code_sections_into_fragments(code_sections)
     return build_output_files(code_fragments, roots)
