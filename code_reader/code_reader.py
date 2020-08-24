@@ -78,6 +78,8 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
                 if match := CODE_BLOCK_START_PATTERN.match(line):
                     close_code_section()
                     new_code_section_name = match.group(1).strip()
+                    if not new_code_section_name:
+                        raise BadSectionNameError(f"section name must not be empty")
                     if BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
                         raise BadSectionNameError(f'section name "{new_code_section_name}" may not contain "<<" or ">>"')
                     code_section = CodeSection(new_code_section_name)
