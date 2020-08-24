@@ -66,14 +66,14 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
             code_sections[code_section.name] += code_section.code
             code_section = None
 
-    def scan_file(file: Path, file_stack: Optional[List[str]] = None):
+    def scan_file(source_file: Path, path_stack: Optional[List[str]] = None):
         nonlocal code_section
-        if file_stack is None:
-            file_stack = []
-        if str(file) in file_stack:
-            raise FileIncludeRecursionError(f'The file "{file}" recursively includes itself')
-        file_stack.append(str(file))
-        with open(file, "r") as f:
+        if path_stack is None:
+            path_stack = []
+        if source_file in path_stack:
+            raise FileIncludeRecursionError(f'The file "{source_file}" recursively includes itself')
+        path_stack.append(source_file)
+        with open(source_file, "r") as f:
             for line in f:
                 if match := CODE_BLOCK_START_PATTERN.match(line):
                     close_code_section()
@@ -86,12 +86,12 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
                 elif match := INCLUDE_STATEMENT_PATTERN.match(line):
                     close_code_section()
                     relative_path = Path(match.group(1))
-                    current_working_directory = file.parent
-                    scan_file(current_working_directory / relative_path, file_stack)
+                    current_working_directory = source_file.parent
+                    scan_file(current_working_directory / relative_path, path_stack)
                 elif code_section:
                     code_section.code += line
             close_code_section()
-        file_stack.pop()
+        path_stack.pop()
 
     scan_file(root_source_file)
     return code_sections
