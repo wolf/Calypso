@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from code_reader.code_reader import get_code_files, CodeSectionRecursionError, NoRootCodeSectionsFoundError, FileIncludeRecursionError
+from code_reader.code_reader import get_code_files
+from code_reader.code_reader import CodeSectionRecursionError, NoRootCodeSectionsFoundError, FileIncludeRecursionError
 
 
 def read_golden_record(path: str):

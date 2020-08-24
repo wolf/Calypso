@@ -28,6 +28,7 @@ class CodeReaderError(RuntimeError):
     def __str__(self):
         print(f"{type(self)}: {self.message}")
 
+
 class CodeSectionRecursionError(CodeReaderError):
     pass
 
@@ -69,7 +70,7 @@ def coalesce_code_sections(file: Path) -> Dict[str, str]:
         if file_stack is None:
             file_stack = []
         if str(file) in file_stack:
-            raise FileIncludeRecursionError(f"The file \"{file}\" recursively includes itself")
+            raise FileIncludeRecursionError(f'The file "{file}" recursively includes itself')
         file_stack.append(str(file))
         with open(file, "r") as f:
             for line in f:
@@ -78,7 +79,7 @@ def coalesce_code_sections(file: Path) -> Dict[str, str]:
                     code_section = CodeSection(match.group(1).strip())
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_code_section()
-                elif (match := INCLUDE_STATEMENT_PATTERN.match(line)):
+                elif (match := INCLUDE_STATEMENT_PATTERN.match(line)) :
                     close_code_section()
                     relative_path = Path(match.group(1))
                     current_working_directory = file.parent
@@ -123,10 +124,10 @@ def assemble_fragments(
     if name_stack is None:
         name_stack = []
     if name in name_stack:
-        raise CodeSectionRecursionError(f"code section \"{name}\" recursively includes itself")
+        raise CodeSectionRecursionError(f'code section "{name}" recursively includes itself')
     name_stack.append(name)
     if name not in fragment_dict:
-        raise NoSuchCodeSectionError(f"code section \"{name}\" not found")
+        raise NoSuchCodeSectionError(f'code section "{name}" not found')
     for fragment in fragment_dict[name]:
         if isinstance(fragment, str):
             needs_indent = result.endswith("\n")
