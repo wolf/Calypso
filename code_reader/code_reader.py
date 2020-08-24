@@ -51,7 +51,7 @@ INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 
 
-def coalesce_code_sections(file: Path) -> Dict[str, str]:
+def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     code_section: Optional[CodeSection] = None
     code_sections: Dict[str, str] = defaultdict(str)
 
@@ -79,7 +79,7 @@ def coalesce_code_sections(file: Path) -> Dict[str, str]:
                     code_section = CodeSection(match.group(1).strip())
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_code_section()
-                elif (match := INCLUDE_STATEMENT_PATTERN.match(line)) :
+                elif match := INCLUDE_STATEMENT_PATTERN.match(line):
                     close_code_section()
                     relative_path = Path(match.group(1))
                     current_working_directory = file.parent
@@ -89,7 +89,7 @@ def coalesce_code_sections(file: Path) -> Dict[str, str]:
             close_code_section()
         file_stack.pop()
 
-    scan_file(file)
+    scan_file(root_source_file)
     return code_sections
 
 
@@ -104,7 +104,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
         for match in CODE_BLOCK_REFERENCE.finditer(code_section):
             name = match.group(3).strip()
             indent = match.group(1) or ""
-            plain_code = code_section[plain_code_start : match.start(2)]
+            plain_code = code_section[plain_code_start:match.start(2)]
             plain_code_start = match.end(2)
             if plain_code:
                 fragment_list.append(plain_code)
