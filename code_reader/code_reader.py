@@ -46,11 +46,11 @@ class FileIncludeRecursionError(CodeReaderError):
     pass
 
 
-CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
-BAD_SECTION_NAME_PATTERN = re.compile(r"<<|>>")
-CODE_BLOCK_REFERENCE = re.compile(r"(?:\n?([ \t]*))?(<<(.*?)>>)")
-INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
+CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
+CODE_BLOCK_REFERENCE_PATTERN = re.compile(r"(?:\n?([ \t]*))?(<<(.*?)>>)")
+INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
+BAD_SECTION_NAME_PATTERN = re.compile(r"<<|>>")
 
 
 def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
@@ -107,7 +107,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tup
         all_section_names.add(code_section_name)
         fragment_list: List[Any] = []
         plain_code_start = 0
-        for match in CODE_BLOCK_REFERENCE.finditer(code_section):
+        for match in CODE_BLOCK_REFERENCE_PATTERN.finditer(code_section):
             name = match.group(3).strip()
             indent = match.group(1) or ""
             plain_code = code_section[plain_code_start:match.start(2)]
