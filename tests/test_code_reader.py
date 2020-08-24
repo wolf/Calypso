@@ -4,6 +4,7 @@ import pytest
 
 from code_reader.code_reader import get_code_files
 from code_reader.code_reader import CodeSectionRecursionError, NoRootCodeSectionsFoundError, FileIncludeRecursionError
+from code_reader.code_reader import BadSectionNameError
 
 
 def read_golden_record(path: str):
@@ -94,6 +95,11 @@ def test_include_files():
 def test_nested_include_files():
     code_files = get_code_files(Path("tests/data/test-nested-include-files.w"))
     assert code_files["generated_output"] == read_golden_record("tests/data/test-nested-include-files")
+
+
+def test_bad_section_names_fail():
+    with pytest.raises(BadSectionNameError):
+        get_code_files(Path("tests/data/test-bad-section-names-fail.w"))
 
 
 def test_recursive_include_files_fail():

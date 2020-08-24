@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 import re
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any, List, Set, Tuple
 
 
 @dataclass
@@ -25,8 +25,9 @@ class CodeReaderError(RuntimeError):
     def __init__(self, message):
         self.message = message
 
-    def __str__(self):
-        print(f"{type(self)}: {self.message}")
+
+class BadSectionNameError(CodeReaderError):
+    pass
 
 
 class CodeSectionRecursionError(CodeReaderError):
@@ -46,6 +47,7 @@ class FileIncludeRecursionError(CodeReaderError):
 
 
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
+BAD_SECTION_NAME_PATTERN = re.compile(r"<<|>>")
 CODE_BLOCK_REFERENCE = re.compile(r"(?:\n?([ \t]*))?(<<(.*?)>>)")
 INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
@@ -58,8 +60,7 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     def close_code_section():
         nonlocal code_section
         if code_section is not None:
-            if code_section.code.endswith("\n"):
-                code_section.code = code_section.code[:-1]
+            code_section.code = code_section.code[:-1]
             if code_section.name in code_sections:
                 code_sections[code_section.name] += "\n"
             code_sections[code_section.name] += code_section.code
@@ -76,7 +77,10 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
             for line in f:
                 if match := CODE_BLOCK_START_PATTERN.match(line):
                     close_code_section()
-                    code_section = CodeSection(match.group(1).strip())
+                    new_code_section_name = match.group(1).strip()
+                    if BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
+                        raise BadSectionNameError(f'section name "{new_code_section_name}" may not contain "<<" or ">>"')
+                    code_section = CodeSection(new_code_section_name)
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_code_section()
                 elif match := INCLUDE_STATEMENT_PATTERN.match(line):
@@ -93,13 +97,13 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     return code_sections
 
 
-def split_code_sections_into_fragments(code_section_dict: Dict[str, str]):
+def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tuple[Dict[str, Any], Set[str]]:
     fragment_dict = {}
     all_section_names = set()
     nonroots = set()
     for code_section_name, code_section in code_section_dict.items():
         all_section_names.add(code_section_name)
-        fragment_list = []
+        fragment_list: List[Any] = []
         plain_code_start = 0
         for match in CODE_BLOCK_REFERENCE.finditer(code_section):
             name = match.group(3).strip()
