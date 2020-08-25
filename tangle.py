@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from code_reader.code_reader import get_code_files, CodeReaderError
-from code_writer.code_writer import write_code_files
+from bootstrap.code_reader import get_code_files, CodeReaderError
+from bootstrap.code_writer import write_code_files
 
 import click
 

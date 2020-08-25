@@ -1,8 +1,8 @@
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-import re
-from typing import Dict, Optional, Any, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass

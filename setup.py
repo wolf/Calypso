@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name="calypso",
     version="0.1",
-    packages=["code_reader", "code_writer"],
+    packages=["bootstrap"],
     url="",
     license="",
     author="Wolf",
