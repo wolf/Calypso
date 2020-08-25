@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
+from bootstrap.code_reader import BadSectionNameError, CodeSectionRecursionError, FileIncludeRecursionError
+from bootstrap.code_reader import NoRootCodeSectionsFoundError, NoSuchCodeSectionError
 from bootstrap.code_reader import get_code_files
-from bootstrap.code_reader import CodeSectionRecursionError, NoRootCodeSectionsFoundError, FileIncludeRecursionError
-from bootstrap.code_reader import BadSectionNameError, NoSuchCodeSectionError
 
 
 def read_golden_record(path: str):
@@ -72,6 +72,12 @@ def test_consecutive_section_includes():
     assert code_files["generated_output"] == read_golden_record("tests/data/test-consecutive-section-includes")
 
 
+@pytest.mark.skip(reason="feature not implemented")
+def test_escaped_references_are_not_expanded():
+    code_files = get_code_files(Path("tests/data/test-escaped-references-are-not-expanded.w"))
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-escaped-references-are-not-expanded")
+
+
 def test_indentation_is_preserved():
     code_files = get_code_files(Path("tests/data/test-indentation-is-preserved.w"))
     assert code_files["generated_output"] == read_golden_record("tests/data/test-indentation-is-preserved")
@@ -79,12 +85,14 @@ def test_indentation_is_preserved():
 
 def test_newlines_are_trimmed_at_eof():
     code_files = get_code_files(Path("tests/data/test-root-ends-with-the-right-number-of-newlines.w"))
-    assert code_files["generated_output"] == read_golden_record("tests/data/test-root-ends-with-the-right-number-of-newlines")
+    golden_record = read_golden_record("tests/data/test-root-ends-with-the-right-number-of-newlines")
+    assert code_files["generated_output"] == golden_record
 
 
 def test_newlines_are_preserved_between_section_pieces():
     code_files = get_code_files(Path("tests/data/test-newlines-are-preserved-between-section-pieces.w"))
-    assert code_files["generated_output"] == read_golden_record("tests/data/test-newlines-are-preserved-between-section-pieces")
+    golden_record = read_golden_record("tests/data/test-newlines-are-preserved-between-section-pieces")
+    assert code_files["generated_output"] == golden_record
 
 
 def test_include_files():

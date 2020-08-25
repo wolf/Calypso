@@ -54,19 +54,36 @@ BAD_SECTION_NAME_PATTERN = re.compile(r"<<|>>")
 
 
 def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
+    """
+    For each unique code-section name in root_source_file and all its includes, build a hunk of text that is all the
+    definitions of that name concatenated together in order.  Return a dictionary that maps each unique code-section
+    name to its complete hunk of text.  Do this by maintaining a CodeSection object to accumulate the text of one
+    section at a time.  It is None while we are not in a code-section.  The contents of the code-sections are not yet
+    processed, so they will still contain references to other code-sections.
+    """
     code_section: Optional[CodeSection] = None
     code_sections: Dict[str, str] = defaultdict(str)
 
     def close_code_section():
+        """
+        If we are collecting text from a code-section: stop collecting; and append it on to any previously collected
+        code with the same name.
+        """
         nonlocal code_section
         if code_section is not None:
-            code_section.code = code_section.code[:-1]
+            # code-sections are stored without a trailing newline
+            code_section.code = code_section.code[:-1]  # chop off the trailing newline (which we definitely found)
             if code_section.name in code_sections:
-                code_sections[code_section.name] += "\n"
+                code_sections[code_section.name] += "\n"  # concatenated code-sections start on a new line
             code_sections[code_section.name] += code_section.code
             code_section = None
 
-    def scan_file(source_file: Path, path_stack: Optional[List[str]] = None):
+    def scan_file(source_file: Path, path_stack: Optional[List[Path]] = None):
+        """
+        Scan through one source file, looking for code-sections.  Maintain a stack of open files so we don't get caught
+        in a recursive loop.  Code sections are terminated by: (1) a new code-section start; (2) a documentation section
+        start; (3) an include statement; or (4) the end of the file.
+        """
         nonlocal code_section
         if path_stack is None:
             path_stack = []
@@ -99,7 +116,10 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     return code_sections
 
 
-def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tuple[Dict[str, Any], Set[str]]:
+def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tuple[Dict[str, List[Any]], Set[str]]:
+    """
+    ...
+    """
     fragment_dict = {}
     all_section_names = set()
     nonroots = set()
@@ -120,7 +140,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tup
             fragment_list.append(code_section[plain_code_start:])
         fragment_dict[code_section_name] = fragment_list
     if all_section_names == nonroots:
-        raise NoRootCodeSectionsFoundError("no root code sections found")
+        raise NoRootCodeSectionsFoundError("no root code-sections found")
     return fragment_dict, (all_section_names - nonroots)
 
 
@@ -130,10 +150,10 @@ def coalesce_fragments(
     if name_stack is None:
         name_stack = []
     if name in name_stack:
-        raise CodeSectionRecursionError(f'code section "{name}" recursively includes itself')
+        raise CodeSectionRecursionError(f'code-section "{name}" recursively includes itself')
     name_stack.append(name)
     if name not in fragment_dict:
-        raise NoSuchCodeSectionError(f'code section "{name}" not found')
+        raise NoSuchCodeSectionError(f'code-section "{name}" not found')
     for fragment in fragment_dict[name]:
         if isinstance(fragment, str):
             needs_indent = result.endswith("\n")
