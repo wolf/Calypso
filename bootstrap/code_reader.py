@@ -83,15 +83,18 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     def scan_file(source_file: Path, path_stack: Optional[List[Path]] = None):
         """
         Scan through one source file, looking for code-sections.  Maintain a stack of open files so we don't get caught
-        in a recursive loop.  Code sections are terminated by: (1) a new code-section start; (2) a documentation section
+        in a recursive loop.  Code-sections are terminated by: (1) a new code-section start; (2) a documentation-section
         start; (3) an include statement; or (4) the end of the file.
         """
         nonlocal code_section
+
+        # manage the stack of open file paths
         if path_stack is None:
             path_stack = []
         if source_file in path_stack:
             raise FileIncludeRecursionError(f'The file "{source_file}" recursively includes itself')
         path_stack.append(source_file)
+
         with open(source_file, "r") as f:
             for line in f:
                 if match := CODE_BLOCK_START_PATTERN.match(line):
@@ -112,6 +115,8 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
                 elif code_section:
                     code_section.code += line
             close_code_section()
+
+        # manage the stack of open file paths
         path_stack.pop()
 
     scan_file(root_source_file)
@@ -149,11 +154,19 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tup
 def coalesce_fragments(
     result: str, name: str, fragment_dict: Dict[str, Any], name_stack: Optional[List[str]] = None, indent: str = ""
 ) -> str:
+    """
+    Recursively step through a list of text fragments and references to other named lists of fragments and assemble them
+    into contiguous hunks of text, being careful to preserve correct indentation.  Maintain a list open fragments as we
+    are assembling them to prevent getting caught in a recursive loop.
+    """
+
+    # manage the stack of open fragment names
     if name_stack is None:
         name_stack = []
     if name in name_stack:
         raise CodeSectionRecursionError(f'code-section "{name}" recursively includes itself')
     name_stack.append(name)
+
     if name not in fragment_dict:
         raise NoSuchCodeSectionError(f'code-section "{name}" not found')
     for fragment in fragment_dict[name]:
@@ -166,7 +179,10 @@ def coalesce_fragments(
                 needs_indent = True
         elif isinstance(fragment, CodeFragmentReference):
             result = coalesce_fragments(result, fragment.name, fragment_dict, name_stack, indent + fragment.indent)
+
+    # manage the stack of open fragment names
     name_stack.pop()
+
     return result
 
 
