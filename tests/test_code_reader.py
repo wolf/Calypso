@@ -72,7 +72,6 @@ def test_consecutive_section_includes():
     assert code_files["generated_output"] == read_golden_record("tests/data/test-consecutive-section-includes")
 
 
-@pytest.mark.skip(reason="feature not implemented")
 def test_escaped_references_are_not_expanded():
     code_files = get_code_files(Path("tests/data/test-escaped-references-are-not-expanded.w"))
     assert code_files["generated_output"] == read_golden_record("tests/data/test-escaped-references-are-not-expanded")

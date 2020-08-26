@@ -38,7 +38,13 @@ class CodeSectionReference:
 
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
-CODE_BLOCK_REFERENCE_PATTERN = re.compile(r"(?:\n?([ \t]*))?(<<(.*?)>>)")
+CODE_BLOCK_REFERENCE_PATTERN = re.compile(r"""
+    (?P<indent>[ \t]*)
+    (?P<complete_reference>                    # throw away the delimiters, so we need to know where they are
+        <<(?P<just_the_referenced_name>.*?)>>  # there may be more than one reference on the line so be non-greedy
+    )
+    """, re.VERBOSE
+)
 INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
 BAD_SECTION_NAME_PATTERN = re.compile(r"<<|>>")
 
@@ -53,7 +59,6 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
 
     This function is called once per top-level source-file.
     """
-
     @dataclass
     class CodeSectionInProgress:
         name: str
@@ -155,16 +160,23 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
         fragment_list: List[Any] = []
         plain_code_start = 0
         for match in CODE_BLOCK_REFERENCE_PATTERN.finditer(code_section):
-            name = match.group(3).strip()
+            reference_is_escaped = False
+            name = match.group("just_the_referenced_name").strip()
             if BAD_SECTION_NAME_PATTERN.search(name):
                 raise BadSectionNameError(f'section name (reference) "{name}" may not contain "<<" or ">>"')
-            indent = match.group(1) or ""
-            plain_code = code_section[plain_code_start : match.start(2)]
-            plain_code_start = match.end(2)
+            indent = match.group("indent") or ""
+            plain_code = code_section[plain_code_start : match.start("complete_reference")]
+            if plain_code.endswith("\\"):
+                plain_code = plain_code[:-1]
+                plain_code_start = match.start("complete_reference")
+                reference_is_escaped = True
+            else:
+                plain_code_start = match.end("complete_reference")
             if plain_code:
                 fragment_list.append(plain_code)
-            fragment_list.append(CodeSectionReference(name, indent))
-            referenced_section_names.add(name)
+            if not reference_is_escaped:
+                fragment_list.append(CodeSectionReference(name, indent))
+                referenced_section_names.add(name)
         if plain_code_start < len(code_section):
             fragment_list.append(code_section[plain_code_start:])
         fragment_dict[code_section_name] = fragment_list
