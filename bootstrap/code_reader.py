@@ -176,7 +176,7 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
 def coalesce_fragments(
     hunk_in_progress: str,
     name: str,
-    fragment_dict: Dict[str, Any],
+    fragment_dict: Dict[str, List[Any]],
     name_stack: Optional[List[str]] = None,
     indent: str = "",
 ) -> str:
@@ -188,7 +188,6 @@ def coalesce_fragments(
     This function is called once for each root code-section definition, and once for each reference to a named code-
     section.
     """
-
     # manage the stack of open fragment names
     if name_stack is None:
         name_stack = []
@@ -217,10 +216,10 @@ def coalesce_fragments(
     return hunk_in_progress
 
 
-def get_code_files(file: Path):
+def get_code_files(file: Path) -> Dict[str, str]:
     code_sections = coalesce_code_sections(file)
-    code_fragments, roots = split_code_sections_into_fragment_lists(code_sections)
-    output_files = {}
+    fragment_lists, roots = split_code_sections_into_fragment_lists(code_sections)
+    output_files: Dict[str, str] = {}
     for root in roots:
-        output_files[root] = coalesce_fragments("", root, code_fragments).rstrip("\r\n") + "\n"
+        output_files[root] = coalesce_fragments("", root, fragment_lists).rstrip("\r\n") + "\n"
     return output_files
