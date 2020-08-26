@@ -6,19 +6,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 
 @dataclass
-class CodeFragmentReference:
+class CodeSectionReference:
     name: str
     indent: str
-
-
-@dataclass
-class CodeSection:
-    name: str
-    code: str
-
-    def __init__(self, name):
-        self.name = name
-        self.code = ""
 
 
 class CodeReaderError(RuntimeError):
@@ -57,17 +47,30 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     """
     For each unique code-section name in root_source_file and all its includes, build a hunk of text that is all the
     definitions of that name concatenated together in order.  Return a dictionary that maps each unique code-section
-    name to its complete hunk of text.  Do this by maintaining a CodeSection object to accumulate the text of one
-    section at a time.  It is None while we are not in a code-section.  The contents of the code-sections are not yet
-    processed, so they will still contain references to other code-sections.
+    name to its complete hunk of text.  Do this by maintaining a CodeSectionInProgress object to accumulate the text of
+    one section at a time.  It is None while we are not in a code-section.  The contents of the code-sections are not
+    yet processed, so they will still contain references to other code-sections.
+
+    This function is called once per top-level source-file.
     """
-    code_section: Optional[CodeSection] = None
+    @dataclass
+    class CodeSectionInProgress:
+        name: str
+        code: str
+
+        def __init__(self, name):
+            self.name = name
+            self.code = ""
+
+    code_section: Optional[CodeSectionInProgress] = None
     code_sections: Dict[str, str] = defaultdict(str)
 
     def close_code_section():
         """
         If we are collecting text from a code-section: stop collecting; and append it on to any previously collected
         code with the same name.
+
+        This function is called after every possible code-section terminal boundary.
         """
         nonlocal code_section
         if code_section is not None:
@@ -85,6 +88,8 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
         Scan through one source file, looking for code-sections.  Maintain a stack of open files so we don't get caught
         in a recursive loop.  Code-sections are terminated by: (1) a new code-section start; (2) a documentation-section
         start; (3) an include statement; or (4) the end of the file.
+
+        This function is called once per source-file.
         """
         nonlocal code_section
 
@@ -104,7 +109,7 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
                         raise BadSectionNameError(f"section name must not be empty")
                     if BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
                         raise BadSectionNameError(f'section name "{new_code_section_name}" may not contain "<<" or ">>"')
-                    code_section = CodeSection(new_code_section_name)
+                    code_section = CodeSectionInProgress(new_code_section_name)
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_code_section()
                 elif match := INCLUDE_STATEMENT_PATTERN.match(line):
@@ -124,9 +129,20 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     return code_sections
 
 
-def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tuple[Dict[str, List[Any]], Set[str]]:
+def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -> Tuple[Dict[str, List[Any]], Set[str]]:
     """
-    ...
+    A code-section starts life as a single hunk of text (a str) containing embedded references to other code-sections.
+    In the final output, each of these embedded references must be replaced with the code it references.  Since code-
+    sections can be referenced more than once (and with different indents) we can't just expand everything in a single
+    pass.  We do it in two steps.  This function is the first step, where we convert every named code-section into a
+    corresponding named fragment-list: a dict->dict transformation.
+
+    A fragment-list is an ordered sequence of two different kinds of objects: (1) a plain hunks of text, represented by
+    str's; or (2) references to named code-sections, represented by a CodeSectionReference's.  The two types do not
+    necessarily alternate.
+
+    Since we see every code-section name and notice if it is ever included, we can also build a set of root names.  We
+    return both the dictionary of named fragment-lists and the set of root names.
     """
     fragment_dict = {}
     all_section_names = set()
@@ -144,7 +160,7 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tup
             plain_code_start = match.end(2)
             if plain_code:
                 fragment_list.append(plain_code)
-            fragment_list.append(CodeFragmentReference(name, indent))
+            fragment_list.append(CodeSectionReference(name, indent))
             nonroots.add(name)
         if plain_code_start < len(code_section):
             fragment_list.append(code_section[plain_code_start:])
@@ -161,6 +177,9 @@ def coalesce_fragments(
     Recursively step through a list of text fragments and references to other named lists of fragments and assemble them
     into contiguous hunks of text, being careful to preserve correct indentation.  Maintain a list open fragments as we
     are assembling them to prevent getting caught in a recursive loop.
+
+    This function is called once for each root code-section definition, and once for each reference to a named
+    code-section.
     """
 
     # manage the stack of open fragment names
@@ -180,7 +199,7 @@ def coalesce_fragments(
                     result += indent
                 result += line
                 needs_indent = True
-        elif isinstance(fragment, CodeFragmentReference):
+        elif isinstance(fragment, CodeSectionReference):
             result = coalesce_fragments(result, fragment.name, fragment_dict, name_stack, indent + fragment.indent)
 
     # manage the stack of open fragment names
@@ -198,5 +217,5 @@ def build_output_files(fragment_dict, roots):
 
 def get_code_files(file: Path):
     code_sections = coalesce_code_sections(file)
-    code_fragments, roots = split_code_sections_into_fragments(code_sections)
+    code_fragments, roots = split_code_sections_into_fragment_lists(code_sections)
     return build_output_files(code_fragments, roots)
