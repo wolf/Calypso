@@ -72,9 +72,11 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
         nonlocal code_section
         if code_section is not None:
             # code-sections are stored without a trailing newline
-            code_section.code = code_section.code[:-1]  # chop off the trailing newline (which we definitely found)
+            if code_section.code.endswith("\n"):
+                code_section.code = code_section.code[:-1]
+            # concatenated code-sections start on a new line
             if code_section.name in code_sections:
-                code_sections[code_section.name] += "\n"  # concatenated code-sections start on a new line
+                code_sections[code_section.name] += "\n"
             code_sections[code_section.name] += code_section.code
             code_section = None
 

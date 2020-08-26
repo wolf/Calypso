@@ -89,6 +89,11 @@ def test_newlines_are_trimmed_at_eof():
     assert code_files["generated_output"] == golden_record
 
 
+def test_last_character_preserved_when_file_does_not_end_with_newline():
+    code_files = get_code_files(Path("tests/data/test-last-character-preserved.w"))
+    assert code_files["generated_output"] == read_golden_record("tests/data/test-last-character-preserved")
+
+
 def test_newlines_are_preserved_between_section_pieces():
     code_files = get_code_files(Path("tests/data/test-newlines-are-preserved-between-section-pieces.w"))
     golden_record = read_golden_record("tests/data/test-newlines-are-preserved-between-section-pieces")
