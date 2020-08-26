@@ -141,7 +141,7 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
     corresponding named fragment-list: a dict->dict transformation.
 
     A fragment-list is an ordered sequence of two different kinds of objects: (1) a plain hunks of text, represented by
-    str's; or (2) references to named code-sections, represented by a CodeSectionReference's.  The two types do not
+    str's; and (2) references to named code-sections, represented by a CodeSectionReference's.  The two types do not
     necessarily alternate.
 
     Since we see every code-section name and notice if it is ever included, we can also build a set of root names.  We
@@ -149,7 +149,7 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
     """
     fragment_dict = {}
     all_section_names = set()
-    nonroots = set()
+    referenced_section_names = set()
     for code_section_name, code_section in code_section_dict.items():
         all_section_names.add(code_section_name)
         fragment_list: List[Any] = []
@@ -164,13 +164,14 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
             if plain_code:
                 fragment_list.append(plain_code)
             fragment_list.append(CodeSectionReference(name, indent))
-            nonroots.add(name)
+            referenced_section_names.add(name)
         if plain_code_start < len(code_section):
             fragment_list.append(code_section[plain_code_start:])
         fragment_dict[code_section_name] = fragment_list
-    if all_section_names == nonroots:
+    roots = all_section_names - referenced_section_names
+    if not roots:
         raise NoRootCodeSectionsFoundError("no root code-sections found")
-    return fragment_dict, (all_section_names - nonroots)
+    return fragment_dict, roots
 
 
 def coalesce_fragments(
@@ -183,12 +184,12 @@ def coalesce_fragments(
     """
     Recursively step through a list of text fragments and references to other named lists of fragments and assemble them
     into contiguous hunks of text, being careful to preserve correct indentation.  Return that contiguous hunk of text.
-    Maintain a list open fragments as we are assembling them to prevent getting caught in a recursive loop.
+    Maintain a stack of open section-names as we are referencing them to prevent getting caught in a recursive loop.
 
     This function is called once for each root code-section definition, and once for each reference to a named code-
     section.
     """
-    # manage the stack of open fragment names
+    # manage the stack of open code-section names
     if name_stack is None:
         name_stack = []
     if name in name_stack:
@@ -210,14 +211,14 @@ def coalesce_fragments(
                 hunk_in_progress, fragment.name, fragment_dict, name_stack, indent + fragment.indent
             )
 
-    # manage the stack of open fragment names
+    # manage the stack of open code-section names
     name_stack.pop()
 
     return hunk_in_progress
 
 
-def get_code_files(file: Path) -> Dict[str, str]:
-    code_sections = coalesce_code_sections(file)
+def get_code_files(root_source_file: Path) -> Dict[str, str]:
+    code_sections = coalesce_code_sections(root_source_file)
     fragment_lists, roots = split_code_sections_into_fragment_lists(code_sections)
     output_files: Dict[str, str] = {}
     for root in roots:
