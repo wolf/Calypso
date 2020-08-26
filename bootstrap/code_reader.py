@@ -114,6 +114,7 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
                     scan_file(current_working_directory / relative_path, path_stack)
                 elif code_section:
                     code_section.code += line
+            # eof also closes an open code-section
             close_code_section()
 
         # manage the stack of open file paths
