@@ -136,6 +136,8 @@ def split_code_sections_into_fragments(code_section_dict: Dict[str, str]) -> Tup
         plain_code_start = 0
         for match in CODE_BLOCK_REFERENCE_PATTERN.finditer(code_section):
             name = match.group(3).strip()
+            if BAD_SECTION_NAME_PATTERN.search(name):
+                raise BadSectionNameError(f'section name (reference) "{name}" may not contain "<<" or ">>"')
             indent = match.group(1) or ""
             plain_code = code_section[plain_code_start:match.start(2)]
             plain_code_start = match.end(2)

@@ -117,6 +117,11 @@ def test_bad_section_names_fail():
         get_code_files(Path("tests/data/test-empty-section-name-fails.w"))
 
 
+def test_bad_reference_names_fail():
+    with pytest.raises(BadSectionNameError):
+        get_code_files(Path("tests/data/test-reference-with-bad-pattern-fails.w"))
+
+
 def test_section_name_not_found_fails():
     with pytest.raises(NoSuchCodeSectionError):
         get_code_files(Path("tests/data/test-section-name-not-found-fails.w"))
