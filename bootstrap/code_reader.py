@@ -5,12 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
-@dataclass
-class CodeSectionReference:
-    name: str
-    indent: str
-
-
 class CodeReaderError(RuntimeError):
     def __init__(self, message):
         self.message = message
@@ -36,6 +30,12 @@ class FileIncludeRecursionError(CodeReaderError):
     pass
 
 
+@dataclass
+class CodeSectionReference:
+    name: str
+    indent: str
+
+
 DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
 CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
 CODE_BLOCK_REFERENCE_PATTERN = re.compile(r"(?:\n?([ \t]*))?(<<(.*?)>>)")
@@ -53,6 +53,7 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
 
     This function is called once per top-level source-file.
     """
+
     @dataclass
     class CodeSectionInProgress:
         name: str
@@ -68,7 +69,7 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
     def close_code_section():
         """
         If we are collecting text from a code-section: stop collecting; and append it on to any previously collected
-        code with the same name.
+        code of the same name.
 
         This function is called after every possible code-section terminal boundary.
         """
@@ -108,7 +109,9 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
                     if not new_code_section_name:
                         raise BadSectionNameError(f"section name must not be empty")
                     if BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
-                        raise BadSectionNameError(f'section name "{new_code_section_name}" may not contain "<<" or ">>"')
+                        raise BadSectionNameError(
+                            f'section name "{new_code_section_name}" may not contain "<<" or ">>"'
+                        )
                     code_section = CodeSectionInProgress(new_code_section_name)
                 elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_code_section()
@@ -117,7 +120,7 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
                     relative_path = Path(match.group(1))
                     current_working_directory = source_file.parent
                     scan_file(current_working_directory / relative_path, path_stack)
-                elif code_section:
+                elif code_section is not None:
                     code_section.code += line
             # eof also closes an open code-section
             close_code_section()
@@ -156,7 +159,7 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
             if BAD_SECTION_NAME_PATTERN.search(name):
                 raise BadSectionNameError(f'section name (reference) "{name}" may not contain "<<" or ">>"')
             indent = match.group(1) or ""
-            plain_code = code_section[plain_code_start:match.start(2)]
+            plain_code = code_section[plain_code_start : match.start(2)]
             plain_code_start = match.end(2)
             if plain_code:
                 fragment_list.append(plain_code)
@@ -171,15 +174,19 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
 
 
 def coalesce_fragments(
-    result: str, name: str, fragment_dict: Dict[str, Any], name_stack: Optional[List[str]] = None, indent: str = ""
+    hunk_in_progress: str,
+    name: str,
+    fragment_dict: Dict[str, Any],
+    name_stack: Optional[List[str]] = None,
+    indent: str = "",
 ) -> str:
     """
     Recursively step through a list of text fragments and references to other named lists of fragments and assemble them
-    into contiguous hunks of text, being careful to preserve correct indentation.  Maintain a list open fragments as we
-    are assembling them to prevent getting caught in a recursive loop.
+    into contiguous hunks of text, being careful to preserve correct indentation.  Return that contiguous hunk of text.
+    Maintain a list open fragments as we are assembling them to prevent getting caught in a recursive loop.
 
-    This function is called once for each root code-section definition, and once for each reference to a named
-    code-section.
+    This function is called once for each root code-section definition, and once for each reference to a named code-
+    section.
     """
 
     # manage the stack of open fragment names
@@ -193,29 +200,27 @@ def coalesce_fragments(
         raise NoSuchCodeSectionError(f'code-section "{name}" not found')
     for fragment in fragment_dict[name]:
         if isinstance(fragment, str):
-            needs_indent = result.endswith("\n")
+            needs_indent = hunk_in_progress.endswith("\n")
             for line in fragment.splitlines(keepends=True):
                 if needs_indent:
-                    result += indent
-                result += line
+                    hunk_in_progress += indent
+                hunk_in_progress += line
                 needs_indent = True
         elif isinstance(fragment, CodeSectionReference):
-            result = coalesce_fragments(result, fragment.name, fragment_dict, name_stack, indent + fragment.indent)
+            hunk_in_progress = coalesce_fragments(
+                hunk_in_progress, fragment.name, fragment_dict, name_stack, indent + fragment.indent
+            )
 
     # manage the stack of open fragment names
     name_stack.pop()
 
-    return result
-
-
-def build_output_files(fragment_dict, roots):
-    output_files = {}
-    for name in roots:
-        output_files[name] = coalesce_fragments("", name, fragment_dict).rstrip("\r\n") + "\n"
-    return output_files
+    return hunk_in_progress
 
 
 def get_code_files(file: Path):
     code_sections = coalesce_code_sections(file)
     code_fragments, roots = split_code_sections_into_fragment_lists(code_sections)
-    return build_output_files(code_fragments, roots)
+    output_files = {}
+    for root in roots:
+        output_files[root] = coalesce_fragments("", root, code_fragments).rstrip("\r\n") + "\n"
+    return output_files
