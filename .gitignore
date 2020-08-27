@@ -118,3 +118,4 @@ tags
 *.egg-info/
 generated_output
 samples/
+archives/

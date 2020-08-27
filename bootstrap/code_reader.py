@@ -142,12 +142,14 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
     A code-section starts life as a single hunk of text (a str) containing embedded references to other code-sections.
     In the final output, each of these embedded references must be replaced with the code it references.  Since code-
     sections can be referenced more than once (and with different indents) we can't just expand everything in a single
-    pass.  We do it in two steps.  This function is the first step, where we convert every named code-section into a
+    pass.  So we do it in two steps.  This function is the first step, where we convert every named code-section into a
     corresponding named fragment-list: a dict->dict transformation.
 
-    A fragment-list is an ordered sequence of two different kinds of objects: (1) a plain hunks of text, represented by
+    A fragment-list is an ordered sequence of two different kinds of objects: (1) a plain hunks of code, represented by
     str's; and (2) references to named code-sections, represented by a CodeSectionReference's.  The two types do not
-    necessarily alternate.
+    necessarily alternate.  While we're looking for references, we're skipping over plain code.  Keep track of where
+    that plain code starts (the end of the last reference we collected) so we can turn that into a fragment in the list
+    when we stop to collect the next reference.
 
     Since we see every code-section name and notice if it is ever included, we can also build a set of root names.  We
     return both the dictionary of named fragment-lists and the set of root names.
@@ -167,16 +169,19 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
             indent = match.group("indent") or ""
             plain_code = code_section[plain_code_start : match.start("complete_reference")]
             if plain_code.endswith("\\"):
+                reference_is_escaped = True
+                # chop off the escape character and collect the reference as plain code
                 plain_code = plain_code[:-1]
                 plain_code_start = match.start("complete_reference")
-                reference_is_escaped = True
             else:
+                # else the next hunk of plain code starts immediately after the reference we are currently collecting
                 plain_code_start = match.end("complete_reference")
             if plain_code:
                 fragment_list.append(plain_code)
             if not reference_is_escaped:
                 fragment_list.append(CodeSectionReference(name, indent))
                 referenced_section_names.add(name)
+        # if there's any un-collected plain code at the end: collect it
         if plain_code_start < len(code_section):
             fragment_list.append(code_section[plain_code_start:])
         fragment_dict[code_section_name] = fragment_list
@@ -230,9 +235,16 @@ def coalesce_fragments(
 
 
 def get_code_files(root_source_file: Path) -> Dict[str, str]:
-    code_sections = coalesce_code_sections(root_source_file)
+    """
+    Pull together all the steps provided above to create complete hunks of text corresponding to output files.  Could
+    have replaced the last four lines with a dictionary comprehension, but this is clearer.
+
+    This function is called once per top-level source file.
+    """
+    code_sections: Dict[str, str] = coalesce_code_sections(root_source_file)
     fragment_lists, roots = split_code_sections_into_fragment_lists(code_sections)
     output_files: Dict[str, str] = {}
     for root in roots:
+        # an output file should end with a single newline
         output_files[root] = coalesce_fragments("", root, fragment_lists).rstrip("\r\n") + "\n"
     return output_files
