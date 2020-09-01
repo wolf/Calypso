@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from bootstrap.code_reader import BadSectionNameError, CodeSectionRecursionError, FileIncludeRecursionError
-from bootstrap.code_reader import NoRootCodeSectionsFoundError, NoSuchCodeSectionError
+from base import BadSectionNameError, CodeSectionRecursionError, FileIncludeRecursionError
+from base import NoRootCodeSectionsFoundError, NoSuchCodeSectionError
 from bootstrap.code_reader import get_code_files
 
 

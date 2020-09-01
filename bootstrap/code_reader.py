@@ -1,54 +1,15 @@
-import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-
-class CodeReaderError(RuntimeError):
-    def __init__(self, message):
-        self.message = message
-
-
-class BadSectionNameError(CodeReaderError):
-    pass
-
-
-class CodeSectionRecursionError(CodeReaderError):
-    pass
-
-
-class NoSuchCodeSectionError(CodeReaderError):
-    pass
-
-
-class NoRootCodeSectionsFoundError(CodeReaderError):
-    pass
-
-
-class FileIncludeRecursionError(CodeReaderError):
-    pass
+import base
 
 
 @dataclass
 class CodeSectionReference:
     name: str
     indent: str
-
-
-DOCUMENTATION_BLOCK_START_PATTERN = re.compile(r"^@$")
-CODE_BLOCK_START_PATTERN = re.compile(r"^<<(.*)>>=$")
-CODE_BLOCK_REFERENCE_PATTERN = re.compile(
-    r"""
-    (?P<indent>[ \t]*)
-    (?P<complete_reference>                    # to throw away the delimiters we need to know where they are
-        <<(?P<just_the_referenced_name>.*?)>>  # there may be more than one reference on the line, so be non-greedy
-    )
-    """,
-    re.VERBOSE,
-)
-INCLUDE_STATEMENT_PATTERN = re.compile(r"^@include\((.*)\)$")
-BAD_SECTION_NAME_PATTERN = re.compile(r"<<|>>")
 
 
 def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
@@ -106,24 +67,24 @@ def coalesce_code_sections(root_source_file: Path) -> Dict[str, str]:
         if path_stack is None:
             path_stack = []
         if source_file in path_stack:
-            raise FileIncludeRecursionError(f'The file "{source_file}" recursively includes itself')
+            raise base.FileIncludeRecursionError(f'The file "{source_file}" recursively includes itself')
         path_stack.append(source_file)
 
         with open(source_file, "r") as f:
             for line in f:
-                if match := CODE_BLOCK_START_PATTERN.match(line):
+                if match := base.CODE_BLOCK_START_PATTERN.match(line):
                     close_code_section()
                     new_code_section_name = match.group(1).strip()
                     if not new_code_section_name:
-                        raise BadSectionNameError(f"section name must not be empty")
-                    if BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
-                        raise BadSectionNameError(
+                        raise base.BadSectionNameError(f"section name must not be empty")
+                    if base.BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
+                        raise base.BadSectionNameError(
                             f'section name "{new_code_section_name}" may not contain "<<" or ">>"'
                         )
                     code_section = CodeSectionInProgress(new_code_section_name)
-                elif DOCUMENTATION_BLOCK_START_PATTERN.match(line):
+                elif base.DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     close_code_section()
-                elif match := INCLUDE_STATEMENT_PATTERN.match(line):
+                elif match := base.INCLUDE_STATEMENT_PATTERN.match(line):
                     close_code_section()
                     relative_path = Path(match.group(1))
                     current_working_directory = source_file.parent
@@ -164,11 +125,11 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
         all_section_names.add(code_section_name)
         fragment_list: List[Any] = []
         plain_code_start = 0
-        for match in CODE_BLOCK_REFERENCE_PATTERN.finditer(code_section):
+        for match in base.CODE_BLOCK_REFERENCE_PATTERN.finditer(code_section):
             reference_is_escaped = False
             name = match.group("just_the_referenced_name").strip()
-            if BAD_SECTION_NAME_PATTERN.search(name):
-                raise BadSectionNameError(f'section name (reference) "{name}" may not contain "<<" or ">>"')
+            if base.BAD_SECTION_NAME_PATTERN.search(name):
+                raise base.BadSectionNameError(f'section name (reference) "{name}" may not contain "<<" or ">>"')
             indent = match.group("indent") or ""
             plain_code = code_section[plain_code_start : match.start("complete_reference")]
             if plain_code.endswith("\\"):
@@ -190,7 +151,7 @@ def split_code_sections_into_fragment_lists(code_section_dict: Dict[str, str]) -
         fragment_dict[code_section_name] = fragment_list
     roots = all_section_names - referenced_section_names
     if not roots:
-        raise NoRootCodeSectionsFoundError("no root code-sections found")
+        raise base.NoRootCodeSectionsFoundError("no root code-sections found")
     return fragment_dict, roots
 
 
@@ -213,11 +174,11 @@ def coalesce_fragments(
     if name_stack is None:
         name_stack = []
     if name in name_stack:
-        raise CodeSectionRecursionError(f'code-section "{name}" recursively includes itself')
+        raise base.CodeSectionRecursionError(f'code-section "{name}" recursively includes itself')
     name_stack.append(name)
 
     if name not in fragment_dict:
-        raise NoSuchCodeSectionError(f'code-section "{name}" not found')
+        raise base.NoSuchCodeSectionError(f'code-section "{name}" not found')
     for fragment in fragment_dict[name]:
         if isinstance(fragment, str):
             needs_indent = hunk_in_progress.endswith("\n")
@@ -248,6 +209,6 @@ def get_code_files(root_source_file: Path) -> Dict[str, str]:
     fragment_lists, roots = split_code_sections_into_fragment_lists(code_sections)
     output_files: Dict[str, str] = {}
     for root in roots:
-        # an output file should end with a single newline
+        # an output file should end with exactly one newline
         output_files[root] = coalesce_fragments("", root, fragment_lists).rstrip("\r\n") + "\n"
     return output_files
