@@ -1,6 +1,6 @@
 # To Do...
 
-* Adopt the standard python package structure (nest one layer deeper down)
+* Use Click to make tangle and weave sub-commands of some outer command
 * Integrate `pluggy` to get plug-in functionality
 * Write the db-based scanner
 * Write the HTML-writing emitter for code sections in weave mode

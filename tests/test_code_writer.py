@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from bootstrap.code_reader import get_code_files
-from bootstrap.code_writer import write_code_files
+from calypso.bootstrap.code_reader import get_code_files
+from calypso.bootstrap.code_writer import write_code_files
 
 
 @pytest.fixture()
