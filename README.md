@@ -1,5 +1,6 @@
 # To Do...
 
+* Make the whole thing callable instead of running calypso.py
 * Add logging
 * Integrate `pluggy` to get plug-in functionality
 * Write the db-based scanner
