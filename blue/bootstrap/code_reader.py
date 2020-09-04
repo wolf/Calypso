@@ -198,7 +198,7 @@ def coalesce_fragments(
     return hunk_in_progress
 
 
-def get_code_files(root_source_file: Path) -> Dict[str, str]:
+def get_code_files(ctx, root_source_file: Path) -> Dict[str, str]:
     """
     Pull together all the steps provided above to create complete hunks of text corresponding to output files.  Could
     have replaced the last four lines with a dictionary comprehension, but this is clearer.

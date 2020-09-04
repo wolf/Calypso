@@ -33,36 +33,41 @@ def manage_output(output_root):
     unlink_all_output_files(output_root)
 
 
-def test_writes_file(output_root, manage_output):
-    code_files = get_code_files(Path("tests/data/test-writes-file.w"))
-    write_code_files(code_files)
+@pytest.fixture()
+def shared_context():
+    return dict(obj={})
+
+
+def test_writes_file(output_root, manage_output, shared_context):
+    code_files = get_code_files(shared_context, Path("tests/data/test-writes-file.w"))
+    write_code_files(shared_context, code_files)
     assert (output_root / "test-writes-file.out").exists()
 
 
-def test_writes_multiple_files(output_root, manage_output):
-    code_files = get_code_files(Path("tests/data/test-writes-multiple-files.w"))
-    write_code_files(code_files)
+def test_writes_multiple_files(output_root, manage_output, shared_context):
+    code_files = get_code_files(shared_context, Path("tests/data/test-writes-multiple-files.w"))
+    write_code_files(shared_context, code_files)
     assert (output_root / "test-writes-multiple-files1.out").exists()
     assert (output_root / "test-writes-multiple-files2.out").exists()
     assert (output_root / "test-writes-multiple-files3.out").exists()
 
 
-def test_writes_select_files(output_root, manage_output):
-    code_files = get_code_files(Path("tests/data/test-writes-multiple-files.w"))
-    write_code_files(code_files, {"tests/output/test-writes-multiple-files2.out", "tests/output/test-writes-multiple-files3.out"})
+def test_writes_select_files(output_root, manage_output, shared_context):
+    code_files = get_code_files(shared_context, Path("tests/data/test-writes-multiple-files.w"))
+    write_code_files(shared_context, code_files, {"tests/output/test-writes-multiple-files2.out", "tests/output/test-writes-multiple-files3.out"})
     assert not (output_root / "test-writes-multiple-files1.out").exists()
     assert (output_root / "test-writes-multiple-files2.out").exists()
     assert (output_root / "test-writes-multiple-files3.out").exists()
 
 
-def test_creates_directories(output_root, manage_output):
-    code_files = get_code_files(Path("tests/data/test-creates-directories.w"))
-    write_code_files(code_files)
+def test_creates_directories(output_root, manage_output, shared_context):
+    code_files = get_code_files(shared_context, Path("tests/data/test-creates-directories.w"))
+    write_code_files(shared_context, code_files)
     assert (output_root / "deeper" / "test-creates-directories.out").exists()
 
 
-def test_respects_supplied_base_directory(output_root, manage_output):
-    code_files = get_code_files(Path("tests/data/test-respects-supplied-base-directory.w"))
-    write_code_files(code_files, base_directory=output_root)
+def test_respects_supplied_base_directory(output_root, manage_output, shared_context):
+    code_files = get_code_files(shared_context, Path("tests/data/test-respects-supplied-base-directory.w"))
+    write_code_files(shared_context, code_files, base_directory=output_root)
     assert (output_root / "a.out").exists()
     assert (output_root / "b" / "c.out").exists()
