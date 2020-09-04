@@ -2,17 +2,16 @@ from pathlib import Path
 
 import click
 
-from calypso.base import CodeReaderError
-from calypso.bootstrap.code_reader import get_code_files
-from calypso.bootstrap.code_writer import write_code_files
-
+from blue.base.exceptions import CodeReaderError
+from blue.bootstrap.code_reader import get_code_files
+from blue.bootstrap.code_writer import write_code_files
 
 @click.group()
-def cli():
+def blue():
     pass
 
 
-@cli.command()
+@blue.command()
 @click.option("--output", "-o", type=str, multiple=True)
 @click.option("--base-dir", type=click.Path(file_okay=False, dir_okay=True, writable=True, readable=True))
 @click.argument(
@@ -29,10 +28,10 @@ def tangle(output, file_paths, base_dir):
             print(f'Error while processing "{file_path}": {e.message}')
 
 
-@cli.command()
+@blue.command()
 def weave():
     click.echo("weaving")
 
 
 if __name__ == "__main__":
-    cli()
+    blue()

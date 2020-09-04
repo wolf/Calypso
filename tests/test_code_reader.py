@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from calypso.base import BadSectionNameError, CodeSectionRecursionError, FileIncludeRecursionError
-from calypso.base import NoRootCodeSectionsFoundError, NoSuchCodeSectionError
-from calypso.bootstrap.code_reader import get_code_files
+from blue.base import BadSectionNameError, CodeSectionRecursionError, FileIncludeRecursionError
+from blue.base import NoRootCodeSectionsFoundError, NoSuchCodeSectionError
+from blue.bootstrap.code_reader import get_code_files
 
 
 def read_golden_record(path: str):
