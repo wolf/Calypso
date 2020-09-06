@@ -10,13 +10,6 @@ from sqlite3 import Connection, Cursor
 import blue.base as base
 
 
-def dict_factory(cursor, row):
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
-
-
 @contextmanager
 def open_cursor(db: Connection) -> Generator:
     cursor: Cursor = db.cursor()
@@ -56,7 +49,7 @@ def assert_parser_state(db: Connection, required_parser_state: ParserState):
 
 def create_database(ctx, db_path: str) -> Connection:
     db = sqlite3.connect(db_path, isolation_level=None)
-    db.row_factory = dict_factory
+    db.row_factory = sqlite3.Row
     ctx.obj["DATABASE_CONNECTION"] = db
     with open("blue/bootstrap/scanner_schema.sql") as f:
         sql_script = f.read()
