@@ -26,3 +26,7 @@ class FileIncludeRecursionError(CodeReaderError):
 
 class NonUniqueAbbreviationError(CodeReaderError):
     pass
+
+
+class ParsingTasksCalledOutOfSequence(CodeReaderError):
+    pass

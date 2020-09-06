@@ -49,6 +49,11 @@ def set_parser_state(db: Connection, new_parser_state: ParserState):
         """, (new_parser_state.value,))
 
 
+def assert_parser_state(db: Connection, required_parser_state: ParserState):
+    if get_parser_state(db) != required_parser_state:
+        raise base.exceptions.ParsingTasksCalledOutOfSequence("Parsing task called out of sequence.")
+
+
 def create_database(ctx, db_path: str) -> Connection:
     db = sqlite3.connect(db_path, isolation_level=None)
     db.row_factory = dict_factory
@@ -66,7 +71,7 @@ def get_database_connection(ctx):
 
 def split_source_document_into_sections(ctx, source_document: Path):
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.NO_WORK_DONE_YET
+    assert_parser_state(db, ParserState.NO_WORK_DONE_YET)
 
     insert_documentation_section = "INSERT INTO document_sections (kind, is_included, data) VALUES (1, ?, ?)"
     insert_code_section = "INSERT INTO document_sections (kind, is_included, name, data) VALUES (2, ?, ?, ?)"
@@ -133,7 +138,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
 
 def assign_sequence_numbers_to_code_sections(ctx):
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.DOCUMENT_SPLIT_INTO_SECTIONS
+    assert_parser_state(db, ParserState.DOCUMENT_SPLIT_INTO_SECTIONS)
 
     find_code_sections = "SELECT id FROM document_sections WHERE is_included IS NULL ORDER BY id"
     assign_sequence_number = "UPDATE document_sections SET code_section_sequence_number = ? WHERE id = ?"
@@ -150,7 +155,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
 
 def split_sections_into_fragment_streams(ctx):
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS
+    assert_parser_state(db, ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS)
 
     write_plain_text_fragment = "INSERT INTO fragments (kind, parent_document_section_id, data) VALUES (1, ?, ?)"
     write_reference_fragment = """
@@ -200,7 +205,7 @@ def split_sections_into_fragment_streams(ctx):
 
 def collect_full_section_names(ctx):
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS
+    assert_parser_state(db, ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS)
 
     find_code_section_names = "SELECT name FROM document_sections WHERE kind = 2 AND name NOT LIKE '%...'"
     find_reference_fragments = "SELECT data as name FROM fragments WHERE kind = 2 AND data NOT LIKE '%...'"
@@ -220,7 +225,7 @@ def collect_full_section_names(ctx):
 
 def resolve_all_abbreviations(ctx):
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.FULL_SECTION_NAMES_COLLECTED
+    assert_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
 
     find_code_sections = "SELECT id, name FROM document_sections WHERE kind = 2 AND name LIKE '%...'"
     find_reference_fragments = "SELECT id, data as name FROM fragments WHERE kind = 2 AND data LIKE '%...'"
@@ -250,7 +255,7 @@ def resolve_all_abbreviations(ctx):
 
 def group_fragment_streams_by_section_name(ctx):
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.ALL_ABBREVIATIONS_RESOLVED
+    assert_parser_state(db, ParserState.ALL_ABBREVIATIONS_RESOLVED)
 
     find_names = "SELECT id, name FROM code_section_full_names"
     group_fragment_streams = """
@@ -340,7 +345,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
     find_full_names = "SELECT name FROM code_section_full_names"
 
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME
+    assert_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
     with open_cursor(db) as full_names_reader:
         full_names_reader.execute(find_full_names)
         all_names = {row["name"] for row in full_names_reader.fetchall()}
@@ -383,7 +388,7 @@ def parse_source_file(ctx, db_path: str, root_source_file: Path):
 
 def get_code_files(ctx):
     db = get_database_connection(ctx)
-    assert get_parser_state(db) == ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT
+    assert_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)
 
     all_resolved_code_sections = """
         SELECT name, code

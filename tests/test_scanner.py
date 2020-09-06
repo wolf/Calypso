@@ -212,4 +212,7 @@ def test_recursive_sections_fail(shared_context):
 
 
 def test_out_of_sequence_parsing_fails(shared_context):
-    pass
+    with pytest.raises(exceptions.ParsingTasksCalledOutOfSequence):
+        scanner.create_database(shared_context, ":memory:")
+        scanner.split_source_document_into_sections(shared_context, Path("tests/data/test-get-roots.w"))
+        scanner.resolve_named_code_sections_into_plain_text(shared_context)
