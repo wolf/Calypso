@@ -77,23 +77,21 @@ def split_source_document_into_sections(ctx, source_document: Path):
     class DocumentationSectionInProgress:
         data: str = ""
 
-        def close(self, db, is_included):
+        def close(self, is_included):
             if self.data:
                 with open_cursor(db, writer=True) as section_writer:
                     section_writer.execute(insert_documentation_section, (1 if is_included else None, self.data))
-
 
     @dataclass()
     class CodeSectionInProgress:
         name: str
         data: str = ""
 
-        def close(self, db, is_included):
+        def close(self, is_included):
             with open_cursor(db, writer=True) as section_writer:
                 if self.data.endswith("\n"):
                     self.data = self.data[:-1]
                 section_writer.execute(insert_code_section, (1 if is_included else None, self.name, self.data))
-
 
     def scan_file(path: Path, path_stack: Optional[List[Path]] = None):
         is_included = path_stack is not None
@@ -107,7 +105,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
             current_section = DocumentationSectionInProgress()
             for line in f:
                 if match := base.CODE_BLOCK_START_PATTERN.match(line):
-                    current_section.close(db, is_included)
+                    current_section.close(is_included)
                     new_code_section_name = match.group(1).strip()
                     if not new_code_section_name:
                         raise base.BadSectionNameError(f"Code-section name must not be empty.")
@@ -117,17 +115,17 @@ def split_source_document_into_sections(ctx, source_document: Path):
                         )
                     current_section = CodeSectionInProgress(new_code_section_name)
                 elif base.DOCUMENTATION_BLOCK_START_PATTERN.match(line):
-                    current_section.close(db, is_included)
+                    current_section.close(is_included)
                     current_section = DocumentationSectionInProgress()
                 elif match := base.INCLUDE_STATEMENT_PATTERN.match(line):
-                    current_section.close(db, is_included)
+                    current_section.close(is_included)
                     relative_path = Path(match.group(1))
                     current_working_directory = path.parent
                     scan_file(current_working_directory / relative_path, path_stack)
                     current_section = DocumentationSectionInProgress()
                 else:
                     current_section.data += line
-            current_section.close(db, is_included)
+            current_section.close(is_included)
 
         path_stack.pop()
 
@@ -157,15 +155,20 @@ def split_sections_into_fragment_streams(ctx):
     assert get_parser_state(db) == ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS
 
     write_plain_text_fragment = "INSERT INTO fragments (kind, parent_document_section_id, data) VALUES (1, ?, ?)"
-    write_reference_fragment = "INSERT INTO fragments (kind, parent_document_section_id, data, indent) VALUES (?, ?, ?, ?)"
+    write_reference_fragment = """
+        INSERT INTO fragments (kind, parent_document_section_id, data, indent) VALUES (?, ?, ?, ?)
+    """
 
     def add_plain_text_fragment(parent_section_id, text):
         with open_cursor(db, writer=True) as fragment_writer:
             fragment_writer.execute(write_plain_text_fragment, (parent_section_id, text))
 
-    def add_reference_fragment(parent_section_id, is_escaped, name, indent):
+    def add_reference_fragment(parent_section_id, is_escaped, name, local_indent):
         with open_cursor(db, writer=True) as fragment_writer:
-            fragment_writer.execute(write_reference_fragment, (3 if is_escaped else 2, parent_section_id, name, indent))
+            fragment_writer.execute(
+                write_reference_fragment,
+                (3 if is_escaped else 2, parent_section_id, name, local_indent)
+            )
 
     find_document_sections = "SELECT id, data FROM document_sections ORDER BY id"
 
@@ -177,9 +180,11 @@ def split_sections_into_fragment_streams(ctx):
             plain_text_start = 0
             for match in base.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
                 reference_is_escaped = False
-                name = match.group("just_the_referenced_name").strip()
-                if base.BAD_SECTION_NAME_PATTERN.search(name):
-                    raise base.BadSectionNameError(f'Section name (reference) "{name}" must not contain "<<" or ">>".')
+                reference_name = match.group("just_the_referenced_name").strip()
+                if base.BAD_SECTION_NAME_PATTERN.search(reference_name):
+                    raise base.BadSectionNameError(
+                        f'Section name (reference) "{reference_name}" must not contain "<<" or ">>".'
+                    )
                 indent = match.group("indent") or ""
                 plain_text = data[plain_text_start : match.start("complete_reference")]
                 if plain_text.endswith("\\"):
@@ -188,7 +193,7 @@ def split_sections_into_fragment_streams(ctx):
                 plain_text_start = match.end("complete_reference")
                 if plain_text:
                     add_plain_text_fragment(section_id, plain_text)
-                add_reference_fragment(section_id, reference_is_escaped, name, indent)
+                add_reference_fragment(section_id, reference_is_escaped, reference_name, indent)
             if plain_text_start < len(data):
                 add_plain_text_fragment(section_id, data[plain_text_start:])
 
@@ -227,14 +232,14 @@ def resolve_all_abbreviations(ctx):
 
     def fix_abbreviations(find, fix):
         with open_cursor(db) as reader:
-            for id, abbreviated_name in reader.execute(find):
+            for found_id, abbreviated_name in reader.execute(find):
                 abbreviated_name = abbreviated_name[:-3]
                 with open_cursor(db) as name_reader:
                     name_reader.execute(find_full_name, (abbreviated_name,))
                     full_name = name_reader.fetchone()["name"]
                     # TO DO: raise an error if full_names did not return exactly one row
                 with open_cursor(db, writer=True) as writer:
-                    writer.execute(fix, (full_name, id))
+                    writer.execute(fix, (full_name, found_id))
 
     fix_abbreviations(find_code_sections, fix_code_section)
     fix_abbreviations(find_reference_fragments, fix_reference_fragment)
@@ -349,11 +354,11 @@ def resolve_named_code_sections_into_plain_text(ctx):
 
     get_full_name_id = "SELECT id FROM code_section_full_names WHERE name = ?"
 
-    for name in all_names:
+    for code_section_name in all_names:
         with open_cursor(db, writer=True) as resolved_code_section_writer:
-            code = coalesce_fragments(name).rstrip("\r\n") + "\n"
+            code = coalesce_fragments(code_section_name).rstrip("\r\n") + "\n"
             with open_cursor(db) as full_name_reader:
-                full_name_reader.execute(get_full_name_id, (name,))
+                full_name_reader.execute(get_full_name_id, (code_section_name,))
                 code_section_name_id = full_name_reader.fetchone()["id"]
             resolved_code_section_writer.execute(insert_resolved_code_section, (code_section_name_id, code))
 
