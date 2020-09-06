@@ -50,7 +50,7 @@ def set_parser_state(db: Connection, new_parser_state: ParserState):
 
 
 def create_database(ctx, db_path: str) -> Connection:
-    db = sqlite3.connect(db_path)
+    db = sqlite3.connect(db_path, isolation_level=None)
     db.row_factory = dict_factory
     ctx.obj["DATABASE_CONNECTION"] = db
     with open("blue/bootstrap/scanner_schema.sql") as f:
@@ -230,14 +230,18 @@ def resolve_all_abbreviations(ctx):
 
     def fix_abbreviations(find, fix):
         with open_cursor(db) as reader:
-            for found_id, abbreviated_name in reader.execute(find):
-                abbreviated_name = abbreviated_name[:-3]
+            for row in reader.execute(find):
+                abbreviated_name = row["name"][:-3]
                 with open_cursor(db) as name_reader:
                     name_reader.execute(find_full_name, (abbreviated_name,))
-                    full_name = name_reader.fetchone()["name"]
-                    # TO DO: raise an error if full_names did not return exactly one row
+                    full_names = {row["name"] for row in name_reader.fetchall()}
+                    if len(full_names) != 1:
+                        raise base.NonUniqueAbbreviationError(
+                            f'The abbreviation "{row["name"]}" does not uniquely identify a code-section.'
+                        )
+                    full_name = full_names.pop()
                 with open_cursor(db) as writer:
-                    writer.execute(fix, (full_name, found_id))
+                    writer.execute(fix, (full_name, row["id"]))
 
     fix_abbreviations(find_code_sections, fix_code_section)
     fix_abbreviations(find_reference_fragments, fix_reference_fragment)

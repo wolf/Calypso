@@ -16,8 +16,13 @@ class NoSuchCodeSectionError(CodeReaderError):
 
 
 class NoRootCodeSectionsFoundError(CodeReaderError):
+    # deprecated
     pass
 
 
 class FileIncludeRecursionError(CodeReaderError):
+    pass
+
+
+class NonUniqueAbbreviationError(CodeReaderError):
     pass
