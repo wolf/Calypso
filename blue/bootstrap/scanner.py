@@ -8,7 +8,6 @@ import sqlite3
 from sqlite3 import Connection, Cursor
 
 import blue.base as base
-from blue.base.exceptions import CodeSectionRecursionError
 
 
 def dict_factory(cursor, row):
@@ -19,10 +18,11 @@ def dict_factory(cursor, row):
 
 
 @contextmanager
-def open_cursor(db: Connection) -> Generator:
+def open_cursor(db: Connection, writer: bool = False) -> Generator:
     cursor: Cursor = db.cursor()
     yield cursor
-    db.commit()
+    if writer:
+        db.commit()
     cursor.close()
 
 
@@ -38,15 +38,15 @@ class ParserState(Enum):
 
 
 def get_parser_state(db: Connection) -> ParserState:
-    with open_cursor(db) as parser_state_cursor:
-        parser_state_cursor.execute("SELECT current_parser_state FROM parser_state WHERE id = 1")
-        current_parser_state = parser_state_cursor.fetchone()["current_parser_state"]
+    with open_cursor(db) as parser_state_reader:
+        parser_state_reader.execute("SELECT current_parser_state FROM parser_state WHERE id = 1")
+        current_parser_state = parser_state_reader.fetchone()["current_parser_state"]
     return ParserState(current_parser_state)
 
 
 def set_parser_state(db: Connection, new_parser_state: ParserState):
-    with open_cursor(db) as parser_state_cursor:
-        parser_state_cursor.execute("""
+    with open_cursor(db, writer=True) as parser_state_writer:
+        parser_state_writer.execute("""
             UPDATE parser_state SET current_parser_state = ? WHERE id = 1
         """, (new_parser_state.value,))
 
@@ -57,8 +57,8 @@ def create_database(ctx, db_path: str) -> Connection:
     ctx.obj["DATABASE_CONNECTION"] = db
     with open("blue/bootstrap/scanner_schema.sql") as f:
         sql_script = f.read()
-    with open_cursor(db) as cursor:
-        cursor.executescript(sql_script)
+    with open_cursor(db, writer=True) as database_writer:
+        database_writer.executescript(sql_script)
     return db
 
 
@@ -70,7 +70,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
     db = get_database_connection(ctx)
     assert get_parser_state(db) == ParserState.NO_WORK_DONE_YET
 
-    insert_document_section = "INSERT INTO document_sections (kind, is_included, data) VALUES (1, ?, ?)"
+    insert_documentation_section = "INSERT INTO document_sections (kind, is_included, data) VALUES (1, ?, ?)"
     insert_code_section = "INSERT INTO document_sections (kind, is_included, name, data) VALUES (2, ?, ?, ?)"
 
     @dataclass()
@@ -79,8 +79,8 @@ def split_source_document_into_sections(ctx, source_document: Path):
 
         def close(self, db, is_included):
             if self.data:
-                with open_cursor(db) as section_writer:
-                    section_writer.execute(insert_document_section, (1 if is_included else None, self.data))
+                with open_cursor(db, writer=True) as section_writer:
+                    section_writer.execute(insert_documentation_section, (1 if is_included else None, self.data))
 
 
     @dataclass()
@@ -89,7 +89,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
         data: str = ""
 
         def close(self, db, is_included):
-            with open_cursor(db) as section_writer:
+            with open_cursor(db, writer=True) as section_writer:
                 if self.data.endswith("\n"):
                     self.data = self.data[:-1]
                 section_writer.execute(insert_code_section, (1 if is_included else None, self.name, self.data))
@@ -145,7 +145,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
     sequence_number = 1
     with open_cursor(db) as code_section_reader:
         for row in code_section_reader.execute(find_code_sections):
-            with open_cursor(db) as code_section_writer:
+            with open_cursor(db, writer=True) as code_section_writer:
                 code_section_writer.execute(assign_sequence_number, (sequence_number, row["id"]))
             sequence_number += 1
 
@@ -160,18 +160,18 @@ def split_sections_into_fragment_streams(ctx):
     write_reference_fragment = "INSERT INTO fragments (kind, parent_document_section, data, indent) VALUES (?, ?, ?, ?)"
 
     def add_plain_text_fragment(parent_section_id, text):
-        with open_cursor(db) as fragment_writer:
+        with open_cursor(db, writer=True) as fragment_writer:
             fragment_writer.execute(write_plain_text_fragment, (parent_section_id, text))
 
     def add_reference_fragment(parent_section_id, is_escaped, name, indent):
-        with open_cursor(db) as fragment_writer:
+        with open_cursor(db, writer=True) as fragment_writer:
             fragment_writer.execute(write_reference_fragment, (3 if is_escaped else 2, parent_section_id, name, indent))
 
     find_document_sections = "SELECT id, data FROM document_sections ORDER BY id"
 
-    with open_cursor(db) as document_sections:
-        document_sections.execute(find_document_sections)
-        for row in document_sections.fetchall():
+    with open_cursor(db) as document_section_reader:
+        document_section_reader.execute(find_document_sections)
+        for row in document_section_reader.fetchall():
             section_id = row["id"]
             data = row["data"]
             plain_text_start = 0
@@ -199,18 +199,18 @@ def collect_full_section_names(ctx):
     db = get_database_connection(ctx)
     assert get_parser_state(db) == ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS
 
-    find_code_sections = "SELECT name FROM document_sections WHERE kind = 2 AND name NOT LIKE '%...'"
+    find_code_section_names = "SELECT name FROM document_sections WHERE kind = 2 AND name NOT LIKE '%...'"
     find_reference_fragments = "SELECT data as name FROM fragments WHERE kind = 2 AND data NOT LIKE '%...'"
     write_names = "INSERT INTO code_section_full_names (name) VALUES (?)"
 
     full_section_names = set()
-    with open_cursor(db) as code_sections:
-        for row in code_sections.execute(find_code_sections):
+    with open_cursor(db) as code_section_reader:
+        for row in code_section_reader.execute(find_code_section_names):
             full_section_names.add(row["name"])
-    with open_cursor(db) as reference_fragments:
-        for row in reference_fragments.execute(find_reference_fragments):
+    with open_cursor(db) as reference_fragment_reader:
+        for row in reference_fragment_reader.execute(find_reference_fragments):
             full_section_names.add(row["name"])
-    with open_cursor(db) as name_writer:
+    with open_cursor(db, writer=True) as name_writer:
         name_writer.executemany(write_names, [(name,) for name in full_section_names])
     set_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
 
@@ -226,15 +226,15 @@ def resolve_all_abbreviations(ctx):
     find_full_name = "SELECT name FROM code_section_full_names WHERE name LIKE ?||'%'"
 
     def fix_abbreviations(find, fix):
-        with open_cursor(db) as records:
-            for id, abbreviated_name in records.execute(find):
+        with open_cursor(db) as reader:
+            for id, abbreviated_name in reader.execute(find):
                 abbreviated_name = abbreviated_name[:-3]
-                with open_cursor(db) as full_names:
-                    full_names.execute(find_full_name, (abbreviated_name,))
-                    full_name = full_names.fetchone()["name"]
+                with open_cursor(db) as name_reader:
+                    name_reader.execute(find_full_name, (abbreviated_name,))
+                    full_name = name_reader.fetchone()["name"]
                     # TO DO: raise an error if full_names did not return exactly one row
-                with open_cursor(db) as record_to_fix:
-                    record_to_fix.execute(fix, (full_name, id))
+                with open_cursor(db, writer=True) as writer:
+                    writer.execute(fix, (full_name, id))
 
     fix_abbreviations(find_code_sections, fix_code_section)
     fix_abbreviations(find_reference_fragments, fix_reference_fragment)
@@ -253,10 +253,10 @@ def group_fragment_streams_by_section_name(ctx):
         )
     """
 
-    with open_cursor(db) as name_cursor:
-        for row in name_cursor.execute(find_names):
-            with open_cursor(db) as update_fragments:
-                update_fragments.execute(group_fragment_streams, (row["id"], row["name"]))
+    with open_cursor(db) as name_reader:
+        for row in name_reader.execute(find_names):
+            with open_cursor(db, writer=True) as fragment_writer:
+                fragment_writer.execute(group_fragment_streams, (row["id"], row["name"]))
     set_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
 
 
@@ -281,8 +281,8 @@ def resolve_named_code_sections_into_plain_text(ctx):
     """
 
     def name_is_a_non_root_code_section(name):
-        with open_cursor(db) as cursor:
-            cursor.execute(insert_non_root_name, (name,))
+        with open_cursor(db, writer=True) as non_root_name_writer:
+            non_root_name_writer.execute(insert_non_root_name, (name,))
 
     def coalesce_fragments(
             name: str,
@@ -297,15 +297,15 @@ def resolve_named_code_sections_into_plain_text(ctx):
         else:
             name_is_a_non_root_code_section(name)
         if name in name_stack:
-            raise CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
+            raise base.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
         name_stack.append(name)
 
-        with open_cursor(db) as fragments:
+        with open_cursor(db) as fragment_reader:
             document_section_separator = ""
             current_document_section = None
-            fragments.execute(find_fragments_by_code_section_name, (name,))
+            fragment_reader.execute(find_fragments_by_code_section_name, (name,))
             number_of_fragments = 0
-            for row in fragments.fetchall():
+            for row in fragment_reader.fetchall():
                 number_of_fragments += 1
                 if row["parent_document_section"] != current_document_section:
                     hunk_in_progress += document_section_separator
@@ -330,15 +330,15 @@ def resolve_named_code_sections_into_plain_text(ctx):
         name_stack.pop()
         return hunk_in_progress
 
-    find_names = "SELECT name FROM code_section_full_names"
+    find_full_names = "SELECT name FROM code_section_full_names"
 
     db = get_database_connection(ctx)
     assert get_parser_state(db) == ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME
-    with open_cursor(db) as names:
-        names.execute(find_names)
-        all_names = {row["name"] for row in names.fetchall()}
+    with open_cursor(db) as full_names_reader:
+        full_names_reader.execute(find_full_names)
+        all_names = {row["name"] for row in full_names_reader.fetchall()}
 
-    insert_complete_code_section = """
+    insert_resolved_code_section = """
         INSERT OR IGNORE INTO resolved_code_sections (code_section_name_id, code) VALUES (?, ?)
     """
 
@@ -347,18 +347,18 @@ def resolve_named_code_sections_into_plain_text(ctx):
         (SELECT code_section_name_id FROM non_root_code_sections)
     """
 
-    get_name_id = "SELECT id FROM code_section_full_names WHERE name = ?"
+    get_full_name_id = "SELECT id FROM code_section_full_names WHERE name = ?"
 
     for name in all_names:
-        with open_cursor(db) as resolved_code_sections:
+        with open_cursor(db, writer=True) as resolved_code_section_writer:
             code = coalesce_fragments(name).rstrip("\r\n") + "\n"
-            with open_cursor(db) as code_section_full_names:
-                code_section_full_names.execute(get_name_id, (name,))
-                code_section_name_id = code_section_full_names.fetchone()["id"]
-            resolved_code_sections.execute(insert_complete_code_section, (code_section_name_id, code))
+            with open_cursor(db) as full_name_reader:
+                full_name_reader.execute(get_full_name_id, (name,))
+                code_section_name_id = full_name_reader.fetchone()["id"]
+            resolved_code_section_writer.execute(insert_resolved_code_section, (code_section_name_id, code))
 
-    with open_cursor(db) as resolved_code_sections:
-        resolved_code_sections.execute(delete_non_root_resolved_code_sections)
+    with open_cursor(db, writer=True) as resolved_code_section_writer:
+        resolved_code_section_writer.execute(delete_non_root_resolved_code_sections)
 
     set_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)
 
@@ -385,8 +385,8 @@ def get_code_files(ctx):
     """
 
     code_files = {}
-    with open_cursor(db) as code_files_cursor:
-        code_files_cursor.execute(all_resolved_code_sections)
-        for row in code_files_cursor.fetchall():
+    with open_cursor(db) as resolved_code_section_reader:
+        resolved_code_section_reader.execute(all_resolved_code_sections)
+        for row in resolved_code_section_reader.fetchall():
             code_files[row["name"]] = row["code"]
     return code_files
