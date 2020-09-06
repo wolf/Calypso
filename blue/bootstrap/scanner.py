@@ -66,8 +66,19 @@ def split_source_document_into_sections(ctx, source_document: Path):
     db = get_database_connection(ctx)
     assert_parser_state(db, ParserState.NO_WORK_DONE_YET)
 
-    insert_documentation_section = "INSERT INTO document_sections (kind, is_included, data) VALUES (1, ?, ?)"
-    insert_code_section = "INSERT INTO document_sections (kind, is_included, name, data) VALUES (2, ?, ?, ?)"
+    insert_documentation_section = """
+        INSERT INTO document_sections (kind, is_included, data) VALUES (
+            (SELECT id FROM document_section_kinds WHERE description = 'documentation'),
+            ?, ?
+        )
+    """
+
+    insert_code_section = """
+        INSERT INTO document_sections (kind, is_included, name, data) VALUES (
+            (SELECT id FROM document_section_kinds WHERE description = 'code'),
+            ?, ?, ?
+        )
+    """
 
     @dataclass()
     class DocumentationSectionInProgress:
@@ -133,7 +144,14 @@ def assign_sequence_numbers_to_code_sections(ctx):
     db = get_database_connection(ctx)
     assert_parser_state(db, ParserState.DOCUMENT_SPLIT_INTO_SECTIONS)
 
-    find_code_sections = "SELECT id FROM document_sections WHERE is_included IS NULL ORDER BY id"
+    find_code_sections = """
+        SELECT document_sections.id
+        FROM document_sections
+        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        WHERE document_section_kinds.description = 'code'
+            AND is_included IS NULL
+        ORDER BY document_sections.id
+    """
     assign_sequence_number = "UPDATE document_sections SET code_section_sequence_number = ? WHERE id = ?"
 
     sequence_number = 1
@@ -150,9 +168,23 @@ def split_sections_into_fragment_streams(ctx):
     db = get_database_connection(ctx)
     assert_parser_state(db, ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS)
 
-    write_plain_text_fragment = "INSERT INTO fragments (kind, parent_document_section_id, data) VALUES (1, ?, ?)"
+    write_plain_text_fragment = """
+        INSERT INTO fragments (kind, parent_document_section_id, data) VALUES (
+            (SELECT id FROM fragment_kinds WHERE description = 'plain text'),
+            ?, ?
+        )
+    """
     write_reference_fragment = """
-        INSERT INTO fragments (kind, parent_document_section_id, data, indent) VALUES (?, ?, ?, ?)
+        INSERT INTO fragments (kind, parent_document_section_id, data, indent) VALUES (
+            (SELECT id FROM fragment_kinds WHERE description = 'reference'),
+            ?, ?, ?
+        )
+    """
+    write_escaped_reference_fragment = """
+        INSERT INTO fragments (kind, parent_document_section_id, data, indent) VALUES (
+            (SELECT id FROM fragment_kinds WHERE description = 'escaped reference'),
+            ?, ?, ?
+        )
     """
 
     def add_plain_text_fragment(parent_section_id, text):
@@ -162,8 +194,8 @@ def split_sections_into_fragment_streams(ctx):
     def add_reference_fragment(parent_section_id, is_escaped, name, local_indent):
         with open_cursor(db) as fragment_writer:
             fragment_writer.execute(
-                write_reference_fragment,
-                (3 if is_escaped else 2, parent_section_id, name, local_indent)
+                write_escaped_reference_fragment if is_escaped else write_reference_fragment,
+                (parent_section_id, name, local_indent)
             )
 
     find_document_sections = "SELECT id, data FROM document_sections ORDER BY id"
@@ -185,7 +217,7 @@ def split_sections_into_fragment_streams(ctx):
                 plain_text = data[plain_text_start : match.start("complete_reference")]
                 if plain_text.endswith("\\"):
                     reference_is_escaped = True
-                    plain_text = plain_text[:-1]
+                    plain_text = plain_text[:-1]  # chop off the escape character '\'
                 plain_text_start = match.end("complete_reference")
                 if plain_text:
                     add_plain_text_fragment(section_id, plain_text)
@@ -200,9 +232,23 @@ def collect_full_section_names(ctx):
     db = get_database_connection(ctx)
     assert_parser_state(db, ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS)
 
-    find_code_section_names = "SELECT name FROM document_sections WHERE kind = 2 AND name NOT LIKE '%...'"
-    find_reference_fragments = "SELECT data as name FROM fragments WHERE kind = 2 AND data NOT LIKE '%...'"
-    write_names = "INSERT INTO code_section_full_names (name) VALUES (?)"
+    find_code_section_names = """
+        SELECT name
+        FROM document_sections
+        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        WHERE description = 'code'
+            AND name NOT LIKE '%...'
+    """
+
+    find_reference_fragments = """
+        SELECT data AS name
+        FROM fragments
+        JOIN fragment_kinds ON fragments.kind = fragment_kinds.id
+        WHERE description = 'reference'
+            AND data NOT LIKE '%...'
+    """
+
+    write_names = "INSERT OR IGNORE INTO code_section_full_names (name) VALUES (?)"
 
     full_section_names = set()
     with open_cursor(db) as code_section_reader:
@@ -220,8 +266,22 @@ def resolve_all_abbreviations(ctx):
     db = get_database_connection(ctx)
     assert_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
 
-    find_code_sections = "SELECT id, name FROM document_sections WHERE kind = 2 AND name LIKE '%...'"
-    find_reference_fragments = "SELECT id, data as name FROM fragments WHERE kind = 2 AND data LIKE '%...'"
+    find_code_sections = """
+        SELECT document_sections.id, name
+        FROM document_sections
+        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        WHERE description = 'code'
+            AND name LIKE '%...'
+    """
+
+    find_reference_fragments = """
+        SELECT fragments.id, data AS name
+        FROM fragments
+        JOIN fragment_kinds ON fragments.kind = fragment_kinds.id
+        WHERE description = 'reference'
+            AND data LIKE '%...'
+    """
+
     fix_code_section = "UPDATE document_sections SET name = ? WHERE id = ?"
     fix_reference_fragment = "UPDATE fragments SET data = ? WHERE id = ?"
     find_full_name = "SELECT name FROM code_section_full_names WHERE name LIKE ?||'%'"
@@ -229,7 +289,7 @@ def resolve_all_abbreviations(ctx):
     def fix_abbreviations(find, fix):
         with open_cursor(db) as reader:
             for row in reader.execute(find):
-                abbreviated_name = row["name"][:-3]
+                abbreviated_name = row["name"][:-3]  # chop off the trailing '...'
                 with open_cursor(db) as name_reader:
                     name_reader.execute(find_full_name, (abbreviated_name,))
                     full_names = {row["name"] for row in name_reader.fetchall()}
