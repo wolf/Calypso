@@ -53,8 +53,8 @@ DROP TABLE IF EXISTS fragments;
 CREATE TABLE fragments (
     id INTEGER PRIMARY KEY NOT NULL,
     kind INTEGER NOT NULL,
-    parent_document_section INTEGER NOT NULL,
-    code_section_name INTEGER,
+    parent_document_section_id INTEGER NOT NULL,
+    code_section_name_id INTEGER,
     data TEXT,
     indent TEXT
 );

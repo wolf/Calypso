@@ -156,8 +156,8 @@ def split_sections_into_fragment_streams(ctx):
     db = get_database_connection(ctx)
     assert get_parser_state(db) == ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS
 
-    write_plain_text_fragment = "INSERT INTO fragments (kind, parent_document_section, data) VALUES (1, ?, ?)"
-    write_reference_fragment = "INSERT INTO fragments (kind, parent_document_section, data, indent) VALUES (?, ?, ?, ?)"
+    write_plain_text_fragment = "INSERT INTO fragments (kind, parent_document_section_id, data) VALUES (1, ?, ?)"
+    write_reference_fragment = "INSERT INTO fragments (kind, parent_document_section_id, data, indent) VALUES (?, ?, ?, ?)"
 
     def add_plain_text_fragment(parent_section_id, text):
         with open_cursor(db, writer=True) as fragment_writer:
@@ -247,8 +247,8 @@ def group_fragment_streams_by_section_name(ctx):
 
     find_names = "SELECT id, name FROM code_section_full_names"
     group_fragment_streams = """
-        UPDATE fragments SET code_section_name = ?
-        WHERE parent_document_section IN (
+        UPDATE fragments SET code_section_name_id = ?
+        WHERE parent_document_section_id IN (
             SELECT id FROM document_sections WHERE name = ?
         )
     """
@@ -270,12 +270,12 @@ def resolve_named_code_sections_into_plain_text(ctx):
     find_fragments_by_code_section_name = """
         SELECT
             description as kind,
-            parent_document_section,
+            parent_document_section_id,
             data,
             indent
         FROM fragments
         LEFT JOIN fragment_kinds ON fragments.kind = fragment_kinds.id
-        WHERE code_section_name = (
+        WHERE code_section_name_id = (
             SELECT id FROM code_section_full_names WHERE name = ?
         )
     """
@@ -302,15 +302,15 @@ def resolve_named_code_sections_into_plain_text(ctx):
 
         with open_cursor(db) as fragment_reader:
             document_section_separator = ""
-            current_document_section = None
+            current_parent_document_section_id = None
             fragment_reader.execute(find_fragments_by_code_section_name, (name,))
             number_of_fragments = 0
             for row in fragment_reader.fetchall():
                 number_of_fragments += 1
-                if row["parent_document_section"] != current_document_section:
+                if row["parent_document_section_id"] != current_parent_document_section_id:
                     hunk_in_progress += document_section_separator
                     document_section_separator = "\n"
-                    current_document_section = row["parent_document_section"]
+                    current_parent_document_section_id = row["parent_document_section_id"]
                 if row["kind"] == "plain text":
                     needs_indent = hunk_in_progress.endswith("\n")
                     for line in row["data"].splitlines(keepends=True):
