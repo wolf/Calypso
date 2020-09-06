@@ -24,7 +24,7 @@ INSERT INTO parser_state (current_parser_state) VALUES (1);
 DROP TABLE IF EXISTS code_section_full_names;
 CREATE TABLE code_section_full_names (
     id INTEGER PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL
+    name TEXT NOT NULL UNIQUE
 );
 
 DROP TABLE IF EXISTS non_root_code_sections;
