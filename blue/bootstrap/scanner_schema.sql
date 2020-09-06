@@ -73,8 +73,8 @@ DROP TABLE IF EXISTS document_sections;
 CREATE TABLE document_sections (
     id INTEGER PRIMARY KEY NOT NULL,
     kind INTEGER NOT NULL,
-    is_included INTEGER,
+    is_included INTEGER, -- 1 or NULL (because there is no BOOLEAN type)
     code_section_sequence_number INTEGER, -- will be NULL for kinds other than 'code'
-    name TEXT,
+    name TEXT, -- will be NULL for kinds other than 'code'
     data TEXT
 );
