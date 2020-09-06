@@ -1,7 +1,9 @@
 # To Do...
 
+* Round out type annotations in scanner.py
+* Settle on a verb from: scan, read, parse and stick to it
+* Add doc-strings
 * Add logging
-* Add more tests for the db-based scanner
 * Add tests for the command-line tools
 * Integrate `pluggy` to get plug-in functionality
 * Write the HTML-writing emitter for code sections in weave mode (as a plugin)
