@@ -25,22 +25,18 @@ def create_database(ctx, db_path: str) -> sqlite3.Connection:
     set_database_connection(ctx, db)
     with open("blue/blue-schema.sql") as f:
         sql_script = f.read()
-    with open_cursor(db) as database_writer:
-        database_writer.executescript(sql_script)
+    db.executescript(sql_script)
     return db
 
 
 def get_parser_state(db: sqlite3.Connection) -> int:
     sql = "SELECT current_parser_state FROM parser_state WHERE id = 1"
-    with open_cursor(db) as parser_state_reader:
-        parser_state_reader.execute(sql)
-        return parser_state_reader.fetchone()["current_parser_state"]
+    return db.execute(sql).fetchone()["current_parser_state"]
 
 
 def set_parser_state(db: sqlite3.Connection, new_parser_state: int):
     sql = "UPDATE parser_state SET current_parser_state = ? WHERE id = 1"
-    with open_cursor(db) as parser_state_writer:
-        parser_state_writer.execute(sql, (new_parser_state,))
+    db.execute(sql, (new_parser_state,))
 
 
 def write_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: str = None):
@@ -50,17 +46,15 @@ def write_document_section(db: sqlite3.Connection, kind: str, data: str, is_incl
             ?, ?, ?
         )
     """
-    with open_cursor(db) as section_writer:
-        section_writer.execute(sql, (kind, int(is_included), name, data))
+    db.execute(sql, (kind, int(is_included), name, data))
 
 
 def read_document_sections(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT id, data FROM document_sections ORDER BY id
     """
-    with open_cursor(db) as section_reader:
-        for row in section_reader.execute(sql):
-            yield row["id"], row["data"]
+    for row in db.execute(sql):
+        yield row
 
 
 def search_for_code_section_ids(db: sqlite3.Connection) -> Generator:
@@ -71,9 +65,8 @@ def search_for_code_section_ids(db: sqlite3.Connection) -> Generator:
         WHERE document_section_kinds.description = 'code'
             AND is_included = 0
     """
-    with open_cursor(db) as code_section_reader:
-        for row in code_section_reader.execute(sql):
-            yield row["id"]
+    for row in db.execute(sql):
+        yield row["id"]
 
 
 def read_resolved_code_sections(db: sqlite3.Connection) -> Generator:
@@ -82,41 +75,36 @@ def read_resolved_code_sections(db: sqlite3.Connection) -> Generator:
         FROM resolved_code_sections
         JOIN code_section_full_names ON code_section_name_id = id
     """
-    with open_cursor(db) as code_section_reader:
-        for row in code_section_reader.execute(sql):
-            yield row
+    for row in db.execute(sql):
+        yield row
 
 
 def write_resolved_code_section(db: sqlite3.Connection, code_section_name_id: int, code: str):
     sql = """
         INSERT OR IGNORE INTO resolved_code_sections (code_section_name_id, code) VALUES (?, ?)
     """
-    with open_cursor(db) as resolved_code_section_writer:
-        resolved_code_section_writer.execute(sql, (code_section_name_id, code))
+    db.execute(sql, (code_section_name_id, code))
 
 
 def assign_code_section_sequence_number(db: sqlite3.Connection, code_section_id: int, sequence_number: int):
     sql = """
         UPDATE document_sections SET code_section_sequence_number = ? WHERE id = ?
     """
-    with open_cursor(db) as code_section_writer:
-        code_section_writer.execute(sql, (sequence_number, code_section_id))
+    db.execute(sql, (sequence_number, code_section_id))
 
 
 def assign_code_section_name(db: sqlite3.Connection, code_section_id: int, name: str):
     sql = """
         UPDATE document_sections SET name = ? WHERE id = ?
     """
-    with open_cursor(db) as code_section_writer:
-        code_section_writer.execute(sql, (name, code_section_id))
+    db.execute(sql, (name, code_section_id))
 
 
 def assign_fragment_name(db: sqlite3.Connection, fragment_id: int, name: str):
     sql = """
         UPDATE fragments SET data = ? WHERE id = ?
     """
-    with open_cursor(db) as fragment_writer:
-        fragment_writer.execute(sql, (name, fragment_id))
+    db.execute(sql, (name, fragment_id))
 
 
 def write_fragment(db: sqlite3.Connection, kind: str, parent_document_section_id: int, data: str, indent: str = ""):
@@ -126,8 +114,7 @@ def write_fragment(db: sqlite3.Connection, kind: str, parent_document_section_id
             ?, ?, ?
         )
     """
-    with open_cursor(db) as fragment_writer:
-        fragment_writer.execute(sql, (kind, parent_document_section_id, data, indent))
+    db.execute(sql, (kind, parent_document_section_id, data, indent))
 
 
 def search_for_unabbreviated_names(db: sqlite3.Connection) -> Generator:
@@ -144,9 +131,8 @@ def search_for_unabbreviated_names(db: sqlite3.Connection) -> Generator:
         WHERE description = 'reference'
             AND data NOT LIKE '%...'
     """
-    with open_cursor(db) as name_finder:
-        for row in name_finder.execute(sql):
-            yield row["name"]
+    for row in db.execute(sql):
+        yield row["name"]
 
 
 def search_for_abbreviated_code_sections(db: sqlite3.Connection) -> Generator:
@@ -157,9 +143,8 @@ def search_for_abbreviated_code_sections(db: sqlite3.Connection) -> Generator:
         WHERE description = 'code'
             AND name LIKE '%...'
     """
-    with open_cursor(db) as code_section_reader:
-        for row in code_section_reader.execute(sql):
-            yield row
+    for row in db.execute(sql):
+        yield row
 
 
 def search_for_abbreviated_reference_fragments(db: sqlite3.Connection) -> Generator:
@@ -170,35 +155,37 @@ def search_for_abbreviated_reference_fragments(db: sqlite3.Connection) -> Genera
         WHERE description = 'reference'
             AND data LIKE '%...'
     """
-    with open_cursor(db) as fragment_reader:
-        for row in fragment_reader.execute(sql):
-            yield row
+    for row in db.execute(sql):
+        yield row
 
 
 def write_unabbreviated_names(db: sqlite3.Connection, names: Iterable):
     sql = """
         INSERT OR IGNORE INTO code_section_full_names (name) VALUES (?)
     """
-    with open_cursor(db) as name_writer:
-        name_writer.executemany(sql, [(name,) for name in names])
+    db.executemany(sql, [(name,) for name in names])
 
 
-def read_unabbreviated_names(db: sqlite3.Connection) -> Generator:
+def read_unabbreviated_names(db: sqlite3.Connection, root_code_sections_only: bool = False) -> Generator:
     sql = """
         SELECT id, name FROM code_section_full_names
     """
-    with open_cursor(db) as name_reader:
-        for row in name_reader.execute(sql):
-            yield row["id"], row["name"]
+    if root_code_sections_only:
+        sql += """
+            EXCEPT
+            SELECT id, name FROM non_root_code_sections
+            JOIN code_section_full_names fn2 ON fn2.id = code_section_name_id
+        """
+    for row in db.execute(sql):
+        yield row
 
 
 def resolve_abbreviation(db: sqlite3.Connection, abbreviation: str) -> Generator:
     sql = """
         SELECT name FROM code_section_full_names WHERE name LIKE ?||'%'
     """
-    with open_cursor(db) as name_reader:
-        for row in name_reader.execute(sql, (abbreviation,)):
-            yield row["name"]
+    for row in db.execute(sql, (abbreviation,)):
+        yield row["name"]
 
 
 def assign_fragment_name_ids(db: sqlite3.Connection, code_section_name_id: int, code_section_name: str):
@@ -208,8 +195,7 @@ def assign_fragment_name_ids(db: sqlite3.Connection, code_section_name_id: int, 
             SELECT id FROM document_sections WHERE name = ?
         )
     """
-    with open_cursor(db) as fragment_writer:
-        fragment_writer.execute(sql, (code_section_name_id, code_section_name))
+    db.execute(sql, (code_section_name_id, code_section_name))
 
 
 def search_for_fragments_belonging_to_this_code_section(db: sqlite3.Connection, code_section_name: str) -> Generator:
@@ -224,9 +210,8 @@ def search_for_fragments_belonging_to_this_code_section(db: sqlite3.Connection, 
             SELECT id FROM code_section_full_names WHERE name = ?
         )
     """
-    with open_cursor(db) as fragment_reader:
-        for row in fragment_reader.execute(sql, (code_section_name,)):
-            yield row
+    for row in db.execute(sql, (code_section_name,)):
+        yield row
 
 
 def write_non_root_name(db: sqlite3.Connection, name: str):
@@ -234,5 +219,14 @@ def write_non_root_name(db: sqlite3.Connection, name: str):
         INSERT OR IGNORE INTO non_root_code_sections (code_section_name_id)
         SELECT id FROM code_section_full_names WHERE name = ?
     """
-    with open_cursor(db) as name_writer:
-        name_writer.execute(sql, (name,))
+    db.execute(sql, (name,))
+
+
+def name_has_a_definition(db: sqlite3.Connection, name: str) -> bool:
+    sql = """
+        SELECT COUNT(*)
+        FROM document_sections
+        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        WHERE name = ?
+    """
+    return db.execute(sql, (name,)).fetchone()[0] != 0
