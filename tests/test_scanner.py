@@ -160,7 +160,7 @@ def test_only_code_sections_are_assigned_sequence_numbers(shared_context):
     count_document_sections_with_sequence_numbers = """
         SELECT count(*) AS count
         FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'documentation'
             AND document_sections.code_section_sequence_number IS NOT NULL
     """
@@ -175,7 +175,7 @@ def test_all_code_sections_are_assigned_sequence_numbers(shared_context):
     count_code_sections_without_sequence_numbers = """
         SELECT count(*) AS count
         FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'code'
             AND document_sections.code_section_sequence_number IS NULL
     """
@@ -190,7 +190,7 @@ def test_sequence_numbers_are_in_order(shared_context):
     find_code_sections = """
         SELECT document_sections.id, code_section_sequence_number
         FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'code'
         ORDER BY document_sections.id
     """

@@ -30,18 +30,18 @@ def create_database(ctx, db_path: str) -> sqlite3.Connection:
 
 
 def get_parser_state(db: sqlite3.Connection) -> int:
-    sql = "SELECT current_parser_state FROM parser_state WHERE id = 1"
-    return db.execute(sql).fetchone()["current_parser_state"]
+    sql = "SELECT current_parser_state_id FROM parser_state WHERE id = 1"
+    return db.execute(sql).fetchone()["current_parser_state_id"]
 
 
 def set_parser_state(db: sqlite3.Connection, new_parser_state: int):
-    sql = "UPDATE parser_state SET current_parser_state = ? WHERE id = 1"
+    sql = "UPDATE parser_state SET current_parser_state_id = ? WHERE id = 1"
     db.execute(sql, (new_parser_state,))
 
 
 def write_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: str = None):
     sql = """
-        INSERT INTO document_sections (kind, is_included, name, data) VALUES (
+        INSERT INTO document_sections (kind_id, is_included, name, data) VALUES (
             (SELECT id FROM document_section_kinds WHERE description = ?),
             ?, ?, ?
         )
@@ -61,9 +61,10 @@ def search_for_code_section_ids(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT document_sections.id
         FROM document_sections
-        INNER JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        INNER JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'code'
             AND is_included = 0
+        ORDER BY document_sections.id
     """
     for row in db.execute(sql):
         yield row["id"]
@@ -109,7 +110,7 @@ def assign_fragment_name(db: sqlite3.Connection, fragment_id: int, name: str):
 
 def write_fragment(db: sqlite3.Connection, kind: str, parent_document_section_id: int, data: str, indent: str = ""):
     sql = """
-        INSERT INTO fragments (kind, parent_document_section_id, data, indent) VALUES (
+        INSERT INTO fragments (kind_id, parent_document_section_id, data, indent) VALUES (
             (SELECT id FROM fragment_kinds WHERE description = ?),
             ?, ?, ?
         )
@@ -121,13 +122,13 @@ def search_for_unabbreviated_names(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT name
         FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE description = 'code'
             AND name NOT LIKE '%...'
         UNION
         SELECT data AS name
         FROM fragments
-        JOIN fragment_kinds ON fragments.kind = fragment_kinds.id
+        JOIN fragment_kinds ON fragments.kind_id = fragment_kinds.id
         WHERE description = 'reference'
             AND data NOT LIKE '%...'
     """
@@ -139,7 +140,7 @@ def search_for_abbreviated_code_sections(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT document_sections.id, name
         FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE description = 'code'
             AND name LIKE '%...'
     """
@@ -151,7 +152,7 @@ def search_for_abbreviated_reference_fragments(db: sqlite3.Connection) -> Genera
     sql = """
         SELECT fragments.id, data AS name
         FROM fragments
-        JOIN fragment_kinds ON fragments.kind = fragment_kinds.id
+        JOIN fragment_kinds ON fragments.kind_id = fragment_kinds.id
         WHERE description = 'reference'
             AND data LIKE '%...'
     """
@@ -205,7 +206,7 @@ def search_for_fragments_belonging_to_this_code_section(db: sqlite3.Connection, 
             data,
             indent
         FROM fragments
-        JOIN fragment_kinds ON fragments.kind = fragment_kinds.id
+        JOIN fragment_kinds ON fragments.kind_id = fragment_kinds.id
         WHERE code_section_name_id = (
             SELECT id FROM code_section_full_names WHERE name = ?
         )
@@ -226,7 +227,7 @@ def name_has_a_definition(db: sqlite3.Connection, name: str) -> bool:
     sql = """
         SELECT COUNT(*)
         FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind = document_section_kinds.id
+        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE name = ?
     """
     return db.execute(sql, (name,)).fetchone()[0] != 0
