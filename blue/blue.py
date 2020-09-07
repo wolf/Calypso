@@ -4,7 +4,8 @@ import click
 
 from blue.base.exceptions import CodeReaderError
 from blue.bootstrap.code_writer import write_code_files
-from blue.bootstrap import scanner
+from blue import scanner
+
 
 @click.group()
 @click.option("--debug/--no-debug", default=False)

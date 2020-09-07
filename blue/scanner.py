@@ -51,7 +51,7 @@ def create_database(ctx, db_path: str) -> Connection:
     db = sqlite3.connect(db_path, isolation_level=None)
     db.row_factory = sqlite3.Row
     ctx.obj["DATABASE_CONNECTION"] = db
-    with open("blue/bootstrap/scanner_schema.sql") as f:
+    with open("blue/blue-schema.sql") as f:
         sql_script = f.read()
     with open_cursor(db) as database_writer:
         database_writer.executescript(sql_script)
@@ -87,6 +87,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
         def close(self, is_included):
             if self.data:
                 with open_cursor(db) as section_writer:
+                    # TODO: use 1 and 0, not 1 and None
                     section_writer.execute(insert_documentation_section, (1 if is_included else None, self.data))
 
     @dataclass()
@@ -98,6 +99,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
             with open_cursor(db) as section_writer:
                 if self.data.endswith("\n"):
                     self.data = self.data[:-1]
+                # TODO: use 1 and 0, not 1 and None
                 section_writer.execute(insert_code_section, (1 if is_included else None, self.name, self.data))
 
     def scan_file(path: Path, path_stack: Optional[List[Path]] = None):
@@ -407,6 +409,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
         INSERT OR IGNORE INTO resolved_code_sections (code_section_name_id, code) VALUES (?, ?)
     """
 
+    # TODO: Don't delete them, just don't ever make them.  Fix root section detection
     delete_non_root_resolved_code_sections = """
         DELETE FROM resolved_code_sections WHERE code_section_name_id IN
         (SELECT code_section_name_id FROM non_root_code_sections)

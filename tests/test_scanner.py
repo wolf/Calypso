@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-import blue.bootstrap.scanner as scanner
+from blue import scanner
 import blue.base.exceptions as exceptions
 
 
