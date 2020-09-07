@@ -224,6 +224,11 @@ def test_section_definition_is_abbreviated_but_included_section_is_not(shared_co
     assert code_files["generated_output"] == read_golden_record("tests/data/test-included-section-name-is-abbreviated")
 
 
+def test_empty_definition_is_ok(shared_context):
+    # should not raise exceptions.NoSuchCodeSectionError
+    scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-empty-definition-is-ok.w"))
+
+
 def test_non_unique_abbreviation_fails(shared_context):
     with pytest.raises(exceptions.NonUniqueAbbreviationError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-non-unique-abbreviation-fails.w"))
