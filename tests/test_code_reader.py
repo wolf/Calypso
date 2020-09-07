@@ -4,7 +4,7 @@ import pytest
 
 from blue.base import BadSectionNameError, CodeSectionRecursionError, FileIncludeRecursionError
 from blue.base import NoRootCodeSectionsFoundError, NoSuchCodeSectionError
-from blue.bootstrap.code_reader import get_code_files
+from blue.bootstrap.original_scanner import get_code_files
 
 
 @pytest.fixture()

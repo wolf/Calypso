@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import sqlite3
 
 from blue import base
 from blue import database
+from blue import patterns
 
 
 class ParserState(Enum):
@@ -34,9 +35,6 @@ def assert_parser_state(db: sqlite3.Connection, required_parser_state: ParserSta
 
 
 def split_source_document_into_sections(ctx, source_document: Path):
-    db = database.get_database_connection(ctx)
-    assert_parser_state(db, ParserState.NO_WORK_DONE_YET)
-
     @dataclass()
     class DocumentationSectionInProgress:
         data: str = ""
@@ -64,22 +62,22 @@ def split_source_document_into_sections(ctx, source_document: Path):
         path_stack.append(path)
 
         with open(path, "r") as f:
-            current_section = DocumentationSectionInProgress()
+            current_section: Union[CodeSectionInProgress, DocumentationSectionInProgress] = DocumentationSectionInProgress()
             for line in f:
-                if match := base.CODE_BLOCK_START_PATTERN.match(line):
+                if match := patterns.CODE_BLOCK_START_PATTERN.match(line):
                     current_section.close(is_included)
                     new_code_section_name = match.group(1).strip()
                     if not new_code_section_name:
                         raise base.BadSectionNameError(f"Code-section name must not be empty.")
-                    if base.BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
+                    if patterns.BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
                         raise base.BadSectionNameError(
                             f'Code-section name "{new_code_section_name}" must not contain "<<" or ">>".'
                         )
                     current_section = CodeSectionInProgress(new_code_section_name)
-                elif base.DOCUMENTATION_BLOCK_START_PATTERN.match(line):
+                elif patterns.DOCUMENTATION_BLOCK_START_PATTERN.match(line):
                     current_section.close(is_included)
                     current_section = DocumentationSectionInProgress()
-                elif match := base.INCLUDE_STATEMENT_PATTERN.match(line):
+                elif match := patterns.INCLUDE_STATEMENT_PATTERN.match(line):
                     current_section.close(is_included)
                     relative_path = Path(match.group(1))
                     current_working_directory = path.parent
@@ -91,6 +89,8 @@ def split_source_document_into_sections(ctx, source_document: Path):
 
         path_stack.pop()
 
+    db = database.get_database_connection(ctx)
+    assert_parser_state(db, ParserState.NO_WORK_DONE_YET)
     scan_file(source_document)
     set_parser_state(db, ParserState.DOCUMENT_SPLIT_INTO_SECTIONS)
 
@@ -110,10 +110,10 @@ def split_sections_into_fragment_streams(ctx):
     assert_parser_state(db, ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS)
     for section_id, data in database.read_document_sections(db):
         plain_text_start = 0
-        for match in base.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
+        for match in patterns.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
             reference_is_escaped = False
             reference_name = match.group("just_the_referenced_name").strip()
-            if base.BAD_SECTION_NAME_PATTERN.search(reference_name):
+            if patterns.BAD_SECTION_NAME_PATTERN.search(reference_name):
                 raise base.BadSectionNameError(
                     f'Section name (reference) "{reference_name}" must not contain "<<" or ">>".'
                 )
@@ -143,19 +143,21 @@ def collect_full_section_names(ctx):
 
 
 def resolve_all_abbreviations(ctx):
-    db = database.get_database_connection(ctx)
-    assert_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
-
     def fix_abbreviations(find, fix):
         for id_to_fix, name in find(db):
             abbreviated_name = name[:-3]  # chop off the trailing '...'
             full_names = set(database.resolve_abbreviation(db, abbreviated_name))
-            if len(full_names) != 1:
+            if (number_of_matches := len(full_names)) != 1:
+                message = "does not identify any code-section."
+                if number_of_matches > 1:
+                    message = f"matches multiple code-sections -- {full_names}."
                 raise base.NonUniqueAbbreviationError(
-                    f'The abbreviation "{name}" does not uniquely identify a code-section.'
+                    f'The abbreviation "{name}" ' + message
                 )
             fix(db, id_to_fix, full_names.pop())
 
+    db = database.get_database_connection(ctx)
+    assert_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
     fix_abbreviations(database.search_for_abbreviated_code_sections, database.assign_code_section_name)
     fix_abbreviations(database.search_for_abbreviated_reference_fragments, database.assign_fragment_name)
     set_parser_state(db, ParserState.ALL_ABBREVIATIONS_RESOLVED)
@@ -171,20 +173,20 @@ def group_fragment_streams_by_section_name(ctx):
 
 def resolve_named_code_sections_into_plain_text(ctx):
     def coalesce_fragments(
+        db_connection: sqlite3.Connection,
         name: str,
         name_stack: Optional[List[str]] = None,
         hunk_in_progress: str = "",
         indent: str = "",
     ) -> str:
-        nonlocal db
 
         if name_stack is None:
             name_stack = []
         else:
-            database.write_non_root_name(db, name)
+            database.write_non_root_name(db_connection, name)
         if name in name_stack:
             raise base.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
-        if not database.name_has_a_definition(db, name):
+        if not database.name_has_a_definition(db_connection, name):
             raise base.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
         name_stack.append(name)
 
@@ -195,7 +197,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
             parent_document_section_id,
             fragment_data,
             fragment_indent,
-        ) in database.search_for_fragments_belonging_to_this_code_section(db, name):
+        ) in database.search_for_fragments_belonging_to_this_code_section(db_connection, name):
             if parent_document_section_id != current_parent_document_section_id:
                 hunk_in_progress += document_section_separator
                 document_section_separator = "\n"
@@ -209,7 +211,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
                     needs_indent = True
             elif kind == "reference":
                 hunk_in_progress = coalesce_fragments(
-                    fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
+                    db_connection, fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
                 )
             elif kind == "escaped reference":
                 hunk_in_progress += "<<" + fragment_data + ">>"
@@ -219,11 +221,9 @@ def resolve_named_code_sections_into_plain_text(ctx):
 
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
-
     for code_section_name_id, code_section_name in database.read_unabbreviated_names(db, root_code_sections_only=True):
-        code = coalesce_fragments(code_section_name).rstrip("\r\n") + "\n"
+        code = coalesce_fragments(db, code_section_name).rstrip("\r\n") + "\n"
         database.write_resolved_code_section(db, code_section_name_id, code)
-
     set_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)
 
 

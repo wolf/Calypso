@@ -3,7 +3,7 @@ from pathlib import Path
 import click
 
 from blue.base.exceptions import CodeReaderError
-from blue.bootstrap.code_writer import write_code_files
+from blue.code_writer import write_code_files
 from blue import scanner
 
 
