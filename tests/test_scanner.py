@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from blue import database
 from blue import scanner
 import blue.base.exceptions as exceptions
 
@@ -17,7 +18,7 @@ def shared_context():
 
 @pytest.fixture()
 def db(shared_context):
-    return scanner.create_database(shared_context, ":memory:")
+    return database.create_database(shared_context, ":memory:")
 
 
 def read_golden_record(path: str):
@@ -167,7 +168,7 @@ def test_included_section_name_is_abbreviated(shared_context):
 
 def test_only_code_sections_are_assigned_sequence_numbers(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
-    db = scanner.get_database_connection(shared_context)
+    db = database.get_database_connection(shared_context)
     count_document_sections_with_sequence_numbers = """
         SELECT count(*) AS count
         FROM document_sections
@@ -175,14 +176,14 @@ def test_only_code_sections_are_assigned_sequence_numbers(shared_context):
         WHERE document_section_kinds.description = 'documentation'
             AND document_sections.code_section_sequence_number IS NOT NULL
     """
-    with scanner.open_cursor(db) as section_reader:
+    with database.open_cursor(db) as section_reader:
         section_reader.execute(count_document_sections_with_sequence_numbers)
         assert section_reader.fetchone()["count"] == 0
 
 
 def test_all_code_sections_are_assigned_sequence_numbers(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
-    db = scanner.get_database_connection(shared_context)
+    db = database.get_database_connection(shared_context)
     count_code_sections_without_sequence_numbers = """
         SELECT count(*) AS count
         FROM document_sections
@@ -190,14 +191,14 @@ def test_all_code_sections_are_assigned_sequence_numbers(shared_context):
         WHERE document_section_kinds.description = 'code'
             AND document_sections.code_section_sequence_number IS NULL
     """
-    with scanner.open_cursor(db) as section_reader:
+    with database.open_cursor(db) as section_reader:
         section_reader.execute(count_code_sections_without_sequence_numbers)
         assert section_reader.fetchone()["count"] == 0
 
 
 def test_sequence_numbers_are_in_order(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
-    db = scanner.get_database_connection(shared_context)
+    db = database.get_database_connection(shared_context)
     find_code_sections = """
         SELECT document_sections.id, code_section_sequence_number
         FROM document_sections
@@ -205,7 +206,7 @@ def test_sequence_numbers_are_in_order(shared_context):
         WHERE document_section_kinds.description = 'code'
         ORDER BY document_sections.id
     """
-    with scanner.open_cursor(db) as code_section_reader:
+    with database.open_cursor(db) as code_section_reader:
         code_section_reader.execute(find_code_sections)
         required_sequence_number = 1
         for row in code_section_reader.fetchall():
@@ -261,6 +262,6 @@ def test_recursive_sections_fail(shared_context):
 
 def test_out_of_sequence_parsing_fails(shared_context):
     with pytest.raises(exceptions.ParsingTasksCalledOutOfSequence):
-        scanner.create_database(shared_context, ":memory:")
+        database.create_database(shared_context, ":memory:")
         scanner.split_source_document_into_sections(shared_context, Path("tests/data/test-get-roots.w"))
         scanner.resolve_named_code_sections_into_plain_text(shared_context)
