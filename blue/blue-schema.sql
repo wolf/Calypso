@@ -19,7 +19,8 @@ CREATE TABLE parser_state (
     id INTEGER PRIMARY KEY NOT NULL,
     current_parser_state INTEGER NOT NULL
 );
-INSERT INTO parser_state (current_parser_state) VALUES (1);
+INSERT INTO parser_state (current_parser_state)
+SELECT id FROM parser_states WHERE description = 'no work done yet';
 
 DROP TABLE IF EXISTS code_section_full_names;
 CREATE TABLE code_section_full_names (
