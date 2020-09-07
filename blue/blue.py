@@ -26,11 +26,11 @@ def blue(ctx, debug, verbose):
     "file_paths", type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True), nargs=-1,
 )
 @click.pass_context
-def tangle(ctx, output, file_paths, base_dir, database):
+def tangle(ctx, extract_only, file_paths, base_dir, database):
     if ctx.obj["VERBOSE"]:
         message = "tangling with debug turned on" if ctx.obj["DEBUG"] else "tangling"
         click.echo(message)
-    roots_to_extract = set(output) or None
+    roots_to_extract = set(extract_only) or None
     for file_path in file_paths:
         try:
             scanner.parse_source_file(ctx, database, Path(file_path))
@@ -41,11 +41,22 @@ def tangle(ctx, output, file_paths, base_dir, database):
 
 
 @blue.command()
+@click.option("--base-dir", type=click.Path(file_okay=False, dir_okay=True, writable=True, readable=True))
+@click.option("--database", type=str, default=":memory:")
+@click.option("--output", "-o", type=click.Path(file_okay=True, writable=True))
+@click.argument(
+    "file_paths", type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True), nargs=-1,
+)
 @click.pass_context
-def weave(ctx):
+def weave(ctx, file_paths, base_dir, database, output):
     if ctx.obj["VERBOSE"]:
         message = "weaving with debug turned on" if ctx.obj["DEBUG"] else "weaving"
         click.echo(message)
+    for file_path in file_paths:
+        try:
+            scanner.parse_source_file(ctx, database, Path(file_path))
+        except BlueScannerError as e:
+            print(f'Error while processing "{file_path}": {e.message}')
 
 
 if __name__ == "__main__":

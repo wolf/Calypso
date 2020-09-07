@@ -25,16 +25,6 @@ def read_golden_record(path: str):
     return golden_record
 
 
-def test_initial_db_state(db):
-    assert scanner.get_parser_state(db) == scanner.ParserState.NO_WORK_DONE_YET
-
-
-def test_set_parser_state(db):
-    assert scanner.get_parser_state(db) == scanner.ParserState.NO_WORK_DONE_YET
-    scanner.set_parser_state(db, scanner.ParserState.ALL_ABBREVIATIONS_RESOLVED)
-    assert scanner.get_parser_state(db) == scanner.ParserState.ALL_ABBREVIATIONS_RESOLVED
-
-
 def test_get_roots(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-get-roots.w"))
     code_files = scanner.get_code_files(shared_context)
