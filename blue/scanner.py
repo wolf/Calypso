@@ -5,14 +5,17 @@ from pathlib import Path
 from typing import Generator, List, Optional
 
 import sqlite3
-from sqlite3 import Connection, Cursor
 
-import blue.base as base
+from blue import base
+
+#
+# TODO: Pull the database stuff out into its own layer
+#
 
 
 @contextmanager
-def open_cursor(db: Connection) -> Generator:
-    cursor: Cursor = db.cursor()
+def open_cursor(db: sqlite3.Connection) -> Generator:
+    cursor: sqlite3.Cursor = db.cursor()
     yield cursor
     cursor.close()
 
@@ -28,26 +31,26 @@ class ParserState(Enum):
     ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT = 8
 
 
-def get_parser_state(db: Connection) -> ParserState:
+def get_parser_state(db: sqlite3.Connection) -> ParserState:
     with open_cursor(db) as parser_state_reader:
         parser_state_reader.execute("SELECT current_parser_state FROM parser_state WHERE id = 1")
         current_parser_state = parser_state_reader.fetchone()["current_parser_state"]
     return ParserState(current_parser_state)
 
 
-def set_parser_state(db: Connection, new_parser_state: ParserState):
+def set_parser_state(db: sqlite3.Connection, new_parser_state: ParserState):
     with open_cursor(db) as parser_state_writer:
         parser_state_writer.execute("""
             UPDATE parser_state SET current_parser_state = ? WHERE id = 1
         """, (new_parser_state.value,))
 
 
-def assert_parser_state(db: Connection, required_parser_state: ParserState):
+def assert_parser_state(db: sqlite3.Connection, required_parser_state: ParserState):
     if get_parser_state(db) != required_parser_state:
         raise base.exceptions.ParsingTasksCalledOutOfSequence("Parsing task called out of sequence.")
 
 
-def create_database(ctx, db_path: str) -> Connection:
+def create_database(ctx, db_path: str) -> sqlite3.Connection:
     db = sqlite3.connect(db_path, isolation_level=None)
     db.row_factory = sqlite3.Row
     ctx.obj["DATABASE_CONNECTION"] = db
