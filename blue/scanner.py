@@ -6,13 +6,7 @@ from typing import List, Optional
 import sqlite3
 
 from blue import base
-from blue.database import open_cursor, create_database, get_database_connection
 from blue import database
-
-
-#
-# TODO: Pull the database stuff out into its own layer
-#
 
 
 class ParserState(Enum):
@@ -40,7 +34,7 @@ def assert_parser_state(db: sqlite3.Connection, required_parser_state: ParserSta
 
 
 def split_source_document_into_sections(ctx, source_document: Path):
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.NO_WORK_DONE_YET)
 
     @dataclass()
@@ -102,7 +96,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
 
 
 def assign_sequence_numbers_to_code_sections(ctx):
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.DOCUMENT_SPLIT_INTO_SECTIONS)
     sequence_number = 1
     for code_section_id in database.search_for_code_section_ids(db):
@@ -112,7 +106,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
 
 
 def split_sections_into_fragment_streams(ctx):
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS)
     for section_id, data in database.read_document_sections(db):
         plain_text_start = 0
@@ -141,7 +135,7 @@ def split_sections_into_fragment_streams(ctx):
 
 
 def collect_full_section_names(ctx):
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS)
     full_section_names = set(database.search_for_unabbreviated_names(db))
     database.write_unabbreviated_names(db, full_section_names)
@@ -149,7 +143,7 @@ def collect_full_section_names(ctx):
 
 
 def resolve_all_abbreviations(ctx):
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
 
     def fix_abbreviations(find, fix):
@@ -168,7 +162,7 @@ def resolve_all_abbreviations(ctx):
 
 
 def group_fragment_streams_by_section_name(ctx):
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.ALL_ABBREVIATIONS_RESOLVED)
     for name_id, name in database.read_unabbreviated_names(db):
         database.assign_fragment_name_ids(db, name_id, name)
@@ -190,63 +184,51 @@ def resolve_named_code_sections_into_plain_text(ctx):
             database.write_non_root_name(db, name)
         if name in name_stack:
             raise base.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
+        if not database.name_has_a_definition(db, name):
+            raise base.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
         name_stack.append(name)
 
-        with open_cursor(db) as fragment_reader:
-            document_section_separator = ""
-            current_parent_document_section_id = None
-            number_of_fragments = 0
-            for (
-                kind,
-                parent_document_section_id,
-                fragment_data,
-                fragment_indent,
-            ) in database.search_for_fragments_belonging_to_this_code_section(db, name):
-                number_of_fragments += 1
-                if parent_document_section_id != current_parent_document_section_id:
-                    hunk_in_progress += document_section_separator
-                    document_section_separator = "\n"
-                    current_parent_document_section_id = parent_document_section_id
-                if kind == "plain text":
-                    needs_indent = hunk_in_progress.endswith("\n")
-                    for line in fragment_data.splitlines(keepends=True):
-                        if needs_indent:
-                            hunk_in_progress += indent
-                        hunk_in_progress += line
-                        needs_indent = True
-                elif kind == "reference":
-                    hunk_in_progress = coalesce_fragments(
-                        fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
-                    )
-                elif kind == "escaped reference":
-                    hunk_in_progress += "<<" + fragment_data + ">>"
-            if not number_of_fragments:
-                raise base.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
+        document_section_separator = ""
+        current_parent_document_section_id = None
+        for (
+            kind,
+            parent_document_section_id,
+            fragment_data,
+            fragment_indent,
+        ) in database.search_for_fragments_belonging_to_this_code_section(db, name):
+            if parent_document_section_id != current_parent_document_section_id:
+                hunk_in_progress += document_section_separator
+                document_section_separator = "\n"
+                current_parent_document_section_id = parent_document_section_id
+            if kind == "plain text":
+                needs_indent = hunk_in_progress.endswith("\n")
+                for line in fragment_data.splitlines(keepends=True):
+                    if needs_indent:
+                        hunk_in_progress += indent
+                    hunk_in_progress += line
+                    needs_indent = True
+            elif kind == "reference":
+                hunk_in_progress = coalesce_fragments(
+                    fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
+                )
+            elif kind == "escaped reference":
+                hunk_in_progress += "<<" + fragment_data + ">>"
 
         name_stack.pop()
         return hunk_in_progress
 
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
 
-    # TODO: Don't delete them, just don't ever make them.  Fix root section detection
-    delete_non_root_resolved_code_sections = """
-        DELETE FROM resolved_code_sections WHERE code_section_name_id IN
-        (SELECT code_section_name_id FROM non_root_code_sections)
-    """
-
-    for code_section_name_id, code_section_name in database.read_unabbreviated_names(db):
+    for code_section_name_id, code_section_name in database.read_unabbreviated_names(db, root_code_sections_only=True):
         code = coalesce_fragments(code_section_name).rstrip("\r\n") + "\n"
         database.write_resolved_code_section(db, code_section_name_id, code)
-
-    with open_cursor(db) as resolved_code_section_writer:
-        resolved_code_section_writer.execute(delete_non_root_resolved_code_sections)
 
     set_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)
 
 
 def parse_source_file(ctx, db_path: str, root_source_file: Path):
-    create_database(ctx, db_path)
+    database.create_database(ctx, db_path)
     split_source_document_into_sections(ctx, root_source_file)
     assign_sequence_numbers_to_code_sections(ctx)
     split_sections_into_fragment_streams(ctx)
@@ -257,6 +239,6 @@ def parse_source_file(ctx, db_path: str, root_source_file: Path):
 
 
 def get_code_files(ctx):
-    db = get_database_connection(ctx)
+    db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)
     return dict(database.read_resolved_code_sections(db))
