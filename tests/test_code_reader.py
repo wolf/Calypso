@@ -2,8 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from blue.base import BadSectionNameError, CodeSectionRecursionError, FileIncludeRecursionError
-from blue.base import NoRootCodeSectionsFoundError, NoSuchCodeSectionError
+from blue import errors
 from blue.bootstrap.original_scanner import get_code_files
 
 
@@ -115,29 +114,29 @@ def test_nested_include_files(shared_context):
 
 
 def test_bad_section_names_fail(shared_context):
-    with pytest.raises(BadSectionNameError):
+    with pytest.raises(errors.BadSectionNameError):
         get_code_files(shared_context, Path("tests/data/test-bad-section-names-fail.w"))
-    with pytest.raises(BadSectionNameError):
+    with pytest.raises(errors.BadSectionNameError):
         get_code_files(shared_context, Path("tests/data/test-empty-section-name-fails.w"))
 
 
 def test_bad_reference_names_fail(shared_context):
-    with pytest.raises(BadSectionNameError):
+    with pytest.raises(errors.BadSectionNameError):
         get_code_files(shared_context, Path("tests/data/test-reference-with-bad-pattern-fails.w"))
 
 
 def test_section_name_not_found_fails(shared_context):
-    with pytest.raises(NoSuchCodeSectionError):
+    with pytest.raises(errors.NoSuchCodeSectionError):
         get_code_files(shared_context, Path("tests/data/test-section-name-not-found-fails.w"))
 
 
 def test_recursive_include_files_fail(shared_context):
-    with pytest.raises(FileIncludeRecursionError):
+    with pytest.raises(errors.FileIncludeRecursionError):
         get_code_files(shared_context, Path("tests/data/test-recursive-include-files-fail.w"))
 
 
 def test_recursive_sections_fail(shared_context):
-    with pytest.raises(CodeSectionRecursionError):
+    with pytest.raises(errors.CodeSectionRecursionError):
         get_code_files(shared_context, Path("tests/data/test-recursive-sections-fail.w"))
-    with pytest.raises(NoRootCodeSectionsFoundError):
+    with pytest.raises(errors.NoRootCodeSectionsFoundError):
         get_code_files(shared_context, Path("tests/data/test-no-roots-means-recursion.w"))

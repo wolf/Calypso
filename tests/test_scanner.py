@@ -2,9 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from blue import database
-from blue import scanner
-import blue.base.exceptions as exceptions
+from blue import database, errors, scanner
 
 
 @pytest.fixture()
@@ -225,48 +223,48 @@ def test_section_definition_is_abbreviated_but_included_section_is_not(shared_co
 
 
 def test_empty_definition_is_ok(shared_context):
-    # should not raise exceptions.NoSuchCodeSectionError
+    # should not raise errors.NoSuchCodeSectionError
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-empty-definition-is-ok.w"))
 
 
 def test_non_unique_abbreviation_fails(shared_context):
-    with pytest.raises(exceptions.NonUniqueAbbreviationError):
+    with pytest.raises(errors.NonUniqueAbbreviationError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-non-unique-abbreviation-fails.w"))
 
 
 def test_bad_section_names_fail(shared_context):
-    with pytest.raises(exceptions.BadSectionNameError):
+    with pytest.raises(errors.BadSectionNameError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-bad-section-names-fail.w"))
-    with pytest.raises(exceptions.BadSectionNameError):
+    with pytest.raises(errors.BadSectionNameError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-empty-section-name-fails.w"))
 
 
 def test_bad_reference_names_fail(shared_context):
-    with pytest.raises(exceptions.BadSectionNameError):
+    with pytest.raises(errors.BadSectionNameError):
         scanner.parse_source_file(
             shared_context, ":memory:", Path("tests/data/test-reference-with-bad-pattern-fails.w")
         )
 
 
 def test_section_name_not_found_fails(shared_context):
-    with pytest.raises(exceptions.NoSuchCodeSectionError):
+    with pytest.raises(errors.NoSuchCodeSectionError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-section-name-not-found-fails.w"))
 
 
 def test_recursive_include_files_fail(shared_context):
-    with pytest.raises(exceptions.FileIncludeRecursionError):
+    with pytest.raises(errors.FileIncludeRecursionError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-recursive-include-files-fail.w"))
 
 
 def test_recursive_sections_fail(shared_context):
-    with pytest.raises(exceptions.CodeSectionRecursionError):
+    with pytest.raises(errors.CodeSectionRecursionError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-recursive-sections-fail.w"))
-    with pytest.raises(exceptions.CodeSectionRecursionError):
+    with pytest.raises(errors.CodeSectionRecursionError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-no-roots-means-recursion.w"))
 
 
 def test_out_of_sequence_parsing_fails(shared_context):
-    with pytest.raises(exceptions.ParsingTasksCalledOutOfSequence):
+    with pytest.raises(errors.ParsingTasksCalledOutOfSequence):
         database.create_database(shared_context, ":memory:")
         scanner.split_source_document_into_sections(shared_context, Path("tests/data/test-get-roots.w"))
         scanner.resolve_named_code_sections_into_plain_text(shared_context)

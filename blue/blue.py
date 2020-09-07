@@ -2,7 +2,7 @@ from pathlib import Path
 
 import click
 
-from blue.base.exceptions import BlueScannerError
+from blue.errors import BlueScannerError
 from blue.code_writer import write_code_files
 from blue import scanner
 

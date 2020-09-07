@@ -5,9 +5,7 @@ from typing import List, Optional, Union
 
 import sqlite3
 
-from blue import base
-from blue import database
-from blue import patterns
+from blue import database, errors, patterns
 
 
 class ParserState(Enum):
@@ -31,7 +29,7 @@ def set_parser_state(db: sqlite3.Connection, new_parser_state: ParserState):
 
 def assert_parser_state(db: sqlite3.Connection, required_parser_state: ParserState):
     if get_parser_state(db) != required_parser_state:
-        raise base.exceptions.ParsingTasksCalledOutOfSequence("Parsing task called out of sequence.")
+        raise errors.ParsingTasksCalledOutOfSequence("Parsing task called out of sequence.")
 
 
 def split_source_document_into_sections(ctx, source_document: Path):
@@ -58,7 +56,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
         if path_stack is None:
             path_stack = []
         if path in path_stack:
-            raise base.FileIncludeRecursionError(f'The file "{path}" recursively includes itself.')
+            raise errors.FileIncludeRecursionError(f'The file "{path}" recursively includes itself.')
         path_stack.append(path)
 
         with open(path, "r") as f:
@@ -68,9 +66,9 @@ def split_source_document_into_sections(ctx, source_document: Path):
                     current_section.close(is_included)
                     new_code_section_name = match.group(1).strip()
                     if not new_code_section_name:
-                        raise base.BadSectionNameError(f"Code-section name must not be empty.")
+                        raise errors.BadSectionNameError(f"Code-section name must not be empty.")
                     if patterns.BAD_SECTION_NAME_PATTERN.search(new_code_section_name):
-                        raise base.BadSectionNameError(
+                        raise errors.BadSectionNameError(
                             f'Code-section name "{new_code_section_name}" must not contain "<<" or ">>".'
                         )
                     current_section = CodeSectionInProgress(new_code_section_name)
@@ -114,7 +112,7 @@ def split_sections_into_fragment_streams(ctx):
             reference_is_escaped = False
             reference_name = match.group("just_the_referenced_name").strip()
             if patterns.BAD_SECTION_NAME_PATTERN.search(reference_name):
-                raise base.BadSectionNameError(
+                raise errors.BadSectionNameError(
                     f'Section name (reference) "{reference_name}" must not contain "<<" or ">>".'
                 )
             indent = match.group("indent") or ""
@@ -151,7 +149,7 @@ def resolve_all_abbreviations(ctx):
                 message = "does not identify any code-section."
                 if number_of_matches > 1:
                     message = f"matches multiple code-sections -- {full_names}."
-                raise base.NonUniqueAbbreviationError(
+                raise errors.NonUniqueAbbreviationError(
                     f'The abbreviation "{name}" ' + message
                 )
             fix(db, id_to_fix, full_names.pop())
@@ -185,9 +183,9 @@ def resolve_named_code_sections_into_plain_text(ctx):
         else:
             database.write_non_root_name(db_connection, name)
         if name in name_stack:
-            raise base.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
+            raise errors.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
         if not database.name_has_a_definition(db_connection, name):
-            raise base.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
+            raise errors.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
         name_stack.append(name)
 
         document_section_separator = ""
