@@ -1,32 +1,32 @@
-class CodeReaderError(RuntimeError):
+class BlueScannerError(RuntimeError):
     def __init__(self, message):
         self.message = message
 
 
-class BadSectionNameError(CodeReaderError):
+class BadSectionNameError(BlueScannerError):
     pass
 
 
-class CodeSectionRecursionError(CodeReaderError):
+class CodeSectionRecursionError(BlueScannerError):
     pass
 
 
-class NoSuchCodeSectionError(CodeReaderError):
+class NoSuchCodeSectionError(BlueScannerError):
     pass
 
 
-class NoRootCodeSectionsFoundError(CodeReaderError):
+class NoRootCodeSectionsFoundError(BlueScannerError):
     # deprecated
     pass
 
 
-class FileIncludeRecursionError(CodeReaderError):
+class FileIncludeRecursionError(BlueScannerError):
     pass
 
 
-class NonUniqueAbbreviationError(CodeReaderError):
+class NonUniqueAbbreviationError(BlueScannerError):
     pass
 
 
-class ParsingTasksCalledOutOfSequence(CodeReaderError):
+class ParsingTasksCalledOutOfSequence(BlueScannerError):
     pass

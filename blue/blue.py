@@ -2,7 +2,7 @@ from pathlib import Path
 
 import click
 
-from blue.base.exceptions import CodeReaderError
+from blue.base.exceptions import BlueScannerError
 from blue.code_writer import write_code_files
 from blue import scanner
 
@@ -36,7 +36,7 @@ def tangle(ctx, output, file_paths, base_dir, database):
             scanner.parse_source_file(ctx, database, Path(file_path))
             code_files = scanner.get_code_files(ctx)
             write_code_files(ctx, code_files, roots_to_extract, base_dir)
-        except CodeReaderError as e:
+        except BlueScannerError as e:
             print(f'Error while processing "{file_path}": {e.message}')
 
 
