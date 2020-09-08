@@ -52,6 +52,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
             database.write_document_section(db, "code", self.data, is_included, self.name)
 
     def scan_file(path: Path, path_stack: Optional[List[Path]] = None):
+        # Manage the stack of open files.
         is_included = path_stack is not None
         if path_stack is None:
             path_stack = []
@@ -85,6 +86,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
                     current_section.data += line
             current_section.close(is_included)
 
+        # Manage the stack of open files.
         path_stack.pop()
 
     db = database.get_database_connection(ctx)
@@ -178,6 +180,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
         indent: str = "",
     ) -> str:
 
+        # Manage the stack of open code-section names.
         if name_stack is None:
             name_stack = []
         else:
@@ -214,12 +217,14 @@ def resolve_named_code_sections_into_plain_text(ctx):
             elif kind == "escaped reference":
                 hunk_in_progress += "<<" + fragment_data + ">>"
 
+        # Manage the stack of open code-section names.
         name_stack.pop()
         return hunk_in_progress
 
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
     for code_section_name_id, code_section_name in database.read_unabbreviated_names(db, root_code_sections_only=True):
+        # an output file should end with exactly one newline
         code = coalesce_fragments(db, code_section_name).rstrip("\r\n") + "\n"
         database.write_resolved_code_section(db, code_section_name_id, code)
     set_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)

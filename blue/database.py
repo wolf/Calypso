@@ -30,12 +30,16 @@ def create_database(ctx, db_path: str) -> sqlite3.Connection:
 
 
 def get_parser_state(db: sqlite3.Connection) -> int:
-    sql = "SELECT current_parser_state_id FROM parser_state WHERE id = 1"
+    sql = """
+        SELECT current_parser_state_id FROM parser_state WHERE id = 1
+    """
     return db.execute(sql).fetchone()["current_parser_state_id"]
 
 
 def set_parser_state(db: sqlite3.Connection, new_parser_state: int):
-    sql = "UPDATE parser_state SET current_parser_state_id = ? WHERE id = 1"
+    sql = """
+        UPDATE parser_state SET current_parser_state_id = ? WHERE id = 1
+    """
     db.execute(sql, (new_parser_state,))
 
 
@@ -175,7 +179,7 @@ def read_unabbreviated_names(db: sqlite3.Connection, root_code_sections_only: bo
         sql += """
             EXCEPT
             SELECT id, name FROM non_root_code_sections
-            JOIN code_section_full_names fn2 ON fn2.id = code_section_name_id
+            JOIN code_section_full_names ON code_section_full_names.id = code_section_name_id
         """
     for row in db.execute(sql):
         yield row
@@ -201,7 +205,8 @@ def assign_fragment_name_ids(db: sqlite3.Connection, code_section_name_id: int, 
 
 def search_for_fragments_belonging_to_this_code_section(db: sqlite3.Connection, code_section_name: str) -> Generator:
     sql = """
-        SELECT description AS kind,
+        SELECT
+            description AS kind,
             parent_document_section_id,
             data,
             indent
@@ -224,6 +229,7 @@ def write_non_root_name(db: sqlite3.Connection, name: str):
 
 
 def name_has_a_definition(db: sqlite3.Connection, name: str) -> bool:
+    # The results of this function can only be trusted _after_ scanner.resolve_all_abbreviations has been called.
     sql = """
         SELECT COUNT(*)
         FROM document_sections
