@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from functools import total_ordering
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -8,6 +9,7 @@ import sqlite3
 from blue import database, errors, patterns
 
 
+@total_ordering
 class ParserState(Enum):
     NO_WORK_DONE_YET = 1
     DOCUMENT_SPLIT_INTO_SECTIONS = 2
@@ -17,6 +19,11 @@ class ParserState(Enum):
     ALL_ABBREVIATIONS_RESOLVED = 6
     FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME = 7
     ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT = 8
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
 
 
 def get_parser_state(db: sqlite3.Connection) -> ParserState:
@@ -99,7 +106,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.DOCUMENT_SPLIT_INTO_SECTIONS)
     sequence_number = 1
-    for code_section_id in database.search_for_code_section_ids(db):
+    for code_section_id in database.search_for_code_section_ids_in_order(db):
         database.assign_code_section_sequence_number(db, code_section_id, sequence_number)
         sequence_number += 1
     set_parser_state(db, ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS)
@@ -111,6 +118,7 @@ def split_sections_into_fragment_streams(ctx):
     for section_id, data in database.read_document_sections(db):
         plain_text_start = 0
         for match in patterns.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
+            # TODO: I'm starting to think escaped references are a bad idea.  Think about this.
             reference_is_escaped = False
             reference_name = match.group("just_the_referenced_name").strip()
             if patterns.BAD_SECTION_NAME_PATTERN.search(reference_name):
@@ -138,7 +146,7 @@ def collect_full_section_names(ctx):
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS)
     full_section_names = set(database.search_for_unabbreviated_names(db))
-    database.write_unabbreviated_names(db, full_section_names)
+    database.write_many_unabbreviated_names(db, full_section_names)
     set_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
 
 
@@ -158,8 +166,8 @@ def resolve_all_abbreviations(ctx):
 
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
-    fix_abbreviations(database.search_for_abbreviated_code_sections, database.assign_code_section_name)
-    fix_abbreviations(database.search_for_abbreviated_reference_fragments, database.assign_fragment_name)
+    fix_abbreviations(database.search_for_abbreviated_code_section_names, database.assign_code_section_name)
+    fix_abbreviations(database.search_for_abbreviated_reference_fragment_names, database.assign_reference_fragment_name)
     set_parser_state(db, ParserState.ALL_ABBREVIATIONS_RESOLVED)
 
 
@@ -198,7 +206,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
             parent_document_section_id,
             fragment_data,
             fragment_indent,
-        ) in database.search_for_fragments_belonging_to_this_code_section(db_connection, name):
+        ) in database.search_for_fragments_belonging_to_this_name(db_connection, name):
             if parent_document_section_id != current_parent_document_section_id:
                 hunk_in_progress += document_section_separator
                 document_section_separator = "\n"
@@ -224,7 +232,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
     for code_section_name_id, code_section_name in database.read_unabbreviated_names(db, root_code_sections_only=True):
-        # an output file should end with exactly one newline
+        # An output file should end with exactly one newline.
         code = coalesce_fragments(db, code_section_name).rstrip("\r\n") + "\n"
         database.write_resolved_code_section(db, code_section_name_id, code)
     set_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)

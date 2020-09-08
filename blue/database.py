@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Generator, Iterable
+from typing import Generator, Iterable, Optional
 
 import sqlite3
 
@@ -43,7 +43,7 @@ def set_parser_state(db: sqlite3.Connection, new_parser_state: int):
     db.execute(sql, (new_parser_state,))
 
 
-def write_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: str = None):
+def write_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: Optional[str] = None):
     sql = """
         INSERT INTO document_sections (kind_id, is_included, name, data) VALUES (
             (SELECT id FROM document_section_kinds WHERE description = ?),
@@ -61,11 +61,11 @@ def read_document_sections(db: sqlite3.Connection) -> Generator:
         yield row
 
 
-def search_for_code_section_ids(db: sqlite3.Connection) -> Generator:
+def search_for_code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT document_sections.id
         FROM document_sections
-        INNER JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
+        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'code'
             AND is_included = 0
         ORDER BY document_sections.id
@@ -105,7 +105,7 @@ def assign_code_section_name(db: sqlite3.Connection, code_section_id: int, name:
     db.execute(sql, (name, code_section_id))
 
 
-def assign_fragment_name(db: sqlite3.Connection, fragment_id: int, name: str):
+def assign_reference_fragment_name(db: sqlite3.Connection, fragment_id: int, name: str):
     sql = """
         UPDATE fragments SET data = ? WHERE id = ?
     """
@@ -140,7 +140,7 @@ def search_for_unabbreviated_names(db: sqlite3.Connection) -> Generator:
         yield row["name"]
 
 
-def search_for_abbreviated_code_sections(db: sqlite3.Connection) -> Generator:
+def search_for_abbreviated_code_section_names(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT document_sections.id, name
         FROM document_sections
@@ -152,7 +152,7 @@ def search_for_abbreviated_code_sections(db: sqlite3.Connection) -> Generator:
         yield row
 
 
-def search_for_abbreviated_reference_fragments(db: sqlite3.Connection) -> Generator:
+def search_for_abbreviated_reference_fragment_names(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT fragments.id, data AS name
         FROM fragments
@@ -164,7 +164,7 @@ def search_for_abbreviated_reference_fragments(db: sqlite3.Connection) -> Genera
         yield row
 
 
-def write_unabbreviated_names(db: sqlite3.Connection, names: Iterable):
+def write_many_unabbreviated_names(db: sqlite3.Connection, names: Iterable):
     sql = """
         INSERT OR IGNORE INTO code_section_full_names (name) VALUES (?)
     """
@@ -203,7 +203,7 @@ def assign_fragment_name_ids(db: sqlite3.Connection, code_section_name_id: int, 
     db.execute(sql, (code_section_name_id, code_section_name))
 
 
-def search_for_fragments_belonging_to_this_code_section(db: sqlite3.Connection, code_section_name: str) -> Generator:
+def search_for_fragments_belonging_to_this_name(db: sqlite3.Connection, code_section_name: str) -> Generator:
     sql = """
         SELECT
             description AS kind,
@@ -215,6 +215,7 @@ def search_for_fragments_belonging_to_this_code_section(db: sqlite3.Connection, 
         WHERE code_section_name_id = (
             SELECT id FROM code_section_full_names WHERE name = ?
         )
+        ORDER BY parent_document_section_id, fragments.id
     """
     for row in db.execute(sql, (code_section_name,)):
         yield row

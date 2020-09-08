@@ -41,7 +41,7 @@ CREATE TABLE document_sections (
    kind_id INTEGER NOT NULL,
    is_included INTEGER, -- 0 or 1 (because there is no BOOLEAN type)
    code_section_sequence_number INTEGER, -- will be NULL for kinds other than 'code'
-   name TEXT, -- will be NULL for kinds other than code
+   name TEXT COLLATE NOCASE, -- will be NULL for kinds other than code
    data TEXT
 );
 
@@ -72,7 +72,7 @@ CREATE TABLE fragments (
 DROP TABLE IF EXISTS code_section_full_names;
 CREATE TABLE code_section_full_names (
     id INTEGER PRIMARY KEY NOT NULL,
-    name TEXT NOT NULL UNIQUE
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE
 );
 
 
