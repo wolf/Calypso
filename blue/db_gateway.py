@@ -29,20 +29,6 @@ def create_database(ctx, db_path: str) -> sqlite3.Connection:
     return db
 
 
-def get_parser_state(db: sqlite3.Connection) -> int:
-    sql = """
-        SELECT current_parser_state_id FROM parser_state WHERE id = 1
-    """
-    return db.execute(sql).fetchone()["current_parser_state_id"]
-
-
-def set_parser_state(db: sqlite3.Connection, new_parser_state: int):
-    sql = """
-        UPDATE parser_state SET current_parser_state_id = ? WHERE id = 1
-    """
-    db.execute(sql, (new_parser_state,))
-
-
 def insert_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: Optional[str] = None):
     sql = """
         INSERT INTO document_sections (kind_id, is_included, name, data) VALUES (

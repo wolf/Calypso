@@ -251,10 +251,3 @@ def test_recursive_sections_fail(shared_context):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-recursive-sections-fail.w"))
     with pytest.raises(errors.CodeSectionRecursionError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-no-roots-means-recursion.w"))
-
-
-def test_out_of_sequence_parsing_fails(shared_context):
-    with pytest.raises(errors.ParsingTasksCalledOutOfSequence):
-        db_gateway.create_database(shared_context, ":memory:")
-        scanner.split_source_document_into_sections(shared_context, Path("tests/data/test-get-roots.w"))
-        scanner.resolve_named_code_sections_into_plain_text(shared_context)

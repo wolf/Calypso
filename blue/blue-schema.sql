@@ -1,28 +1,3 @@
-DROP TABLE IF EXISTS parser_states;
-CREATE TABLE parser_states (
-    id INTEGER PRIMARY KEY NOT NULL,
-    description TEXT
-);
-INSERT INTO parser_states (id, description) VALUES
-    (1, 'no work done yet'),
-    (2, 'document split into sections'),
-    (3, 'sequence numbers assigned to code sections'),
-    (4, 'sections split into fragment streams'),
-    (5, 'all abbreviations resolved'),
-    (6, 'fragment streams grouped by section name'),
-    (7, 'root code sections resolved into plain text')
-;
-
-
-DROP TABLE IF EXISTS parser_state;
-CREATE TABLE parser_state (
-    id INTEGER PRIMARY KEY NOT NULL,
-    current_parser_state_id INTEGER NOT NULL
-);
-INSERT INTO parser_state (current_parser_state_id)
-SELECT id FROM parser_states WHERE description = 'no work done yet';
-
-
 DROP TABLE IF EXISTS document_section_kinds;
 CREATE TABLE document_section_kinds (
     id INTEGER PRIMARY KEY NOT NULL,
