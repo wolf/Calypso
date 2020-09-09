@@ -53,7 +53,7 @@ def insert_document_section(db: sqlite3.Connection, kind: str, data: str, is_inc
     db.execute(sql, (kind, int(is_included), name, data))
 
 
-def fetch_document_sections(db: sqlite3.Connection) -> Generator:
+def document_sections_in_order(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT id, data FROM document_sections ORDER BY id
     """
@@ -61,7 +61,7 @@ def fetch_document_sections(db: sqlite3.Connection) -> Generator:
         yield row
 
 
-def search_for_code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
+def code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT document_sections.id
         FROM document_sections
@@ -74,7 +74,7 @@ def search_for_code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
         yield row["id"]
 
 
-def fetch_resolved_code_sections(db: sqlite3.Connection) -> Generator:
+def resolved_code_sections(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT name, code
         FROM resolved_code_sections
@@ -122,8 +122,9 @@ def insert_fragment(db: sqlite3.Connection, kind: str, parent_document_section_i
     db.execute(sql, (kind, parent_document_section_id, data, indent))
 
 
-def search_for_unabbreviated_names(db: sqlite3.Connection) -> Generator:
+def collect_all_unabbreviated_names(db: sqlite3.Connection):
     sql = """
+        INSERT OR IGNORE INTO code_section_full_names (name)
         SELECT name
         FROM document_sections
         JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
@@ -136,11 +137,10 @@ def search_for_unabbreviated_names(db: sqlite3.Connection) -> Generator:
         WHERE description = 'reference'
             AND data NOT LIKE '%...'
     """
-    for row in db.execute(sql):
-        yield row["name"]
+    db.execute(sql)
 
 
-def search_for_abbreviated_code_section_names(db: sqlite3.Connection) -> Generator:
+def abbreviated_code_section_names(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT document_sections.id, name
         FROM document_sections
@@ -152,7 +152,7 @@ def search_for_abbreviated_code_section_names(db: sqlite3.Connection) -> Generat
         yield row
 
 
-def search_for_abbreviated_reference_fragment_names(db: sqlite3.Connection) -> Generator:
+def abbreviated_reference_fragment_names(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT fragments.id, data AS name
         FROM fragments
@@ -164,14 +164,7 @@ def search_for_abbreviated_reference_fragment_names(db: sqlite3.Connection) -> G
         yield row
 
 
-def insert_many_unabbreviated_names(db: sqlite3.Connection, names: Iterable):
-    sql = """
-        INSERT OR IGNORE INTO code_section_full_names (name) VALUES (?)
-    """
-    db.executemany(sql, [(name,) for name in names])
-
-
-def fetch_unabbreviated_names(db: sqlite3.Connection, root_code_sections_only: bool = False) -> Generator:
+def unabbreviated_names(db: sqlite3.Connection, root_code_sections_only: bool = False) -> Generator:
     sql = """
         SELECT id, name FROM code_section_full_names
     """
@@ -229,7 +222,7 @@ def insert_non_root_name(db: sqlite3.Connection, name: str):
     db.execute(sql, (name,))
 
 
-def name_has_a_definition(db: sqlite3.Connection, name: str) -> bool:
+def is_name_defined_by_code_section(db: sqlite3.Connection, name: str) -> bool:
     # The results of this function can only be trusted _after_ scanner.resolve_all_abbreviations has been called.
     sql = """
         SELECT COUNT(*)

@@ -8,10 +8,9 @@ INSERT INTO parser_states (id, description) VALUES
     (2, 'document split into sections'),
     (3, 'sequence numbers assigned to code sections'),
     (4, 'sections split into fragment streams'),
-    (5, 'full section names collected'),
-    (6, 'all abbreviations resolved'),
-    (7, 'fragment streams grouped by section name'),
-    (8, 'root code sections resolved into plain text')
+    (5, 'all abbreviations resolved'),
+    (6, 'fragment streams grouped by section name'),
+    (7, 'root code sections resolved into plain text')
 ;
 
 

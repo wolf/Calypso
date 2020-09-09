@@ -15,10 +15,9 @@ class ParserState(Enum):
     DOCUMENT_SPLIT_INTO_SECTIONS = 2
     SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS = 3
     SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS = 4
-    FULL_SECTION_NAMES_COLLECTED = 5
-    ALL_ABBREVIATIONS_RESOLVED = 6
-    FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME = 7
-    ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT = 8
+    ALL_ABBREVIATIONS_RESOLVED = 5
+    FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME = 6
+    ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT = 7
 
     def __lt__(self, other):
         if self.__class__ is other.__class__:
@@ -106,7 +105,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.DOCUMENT_SPLIT_INTO_SECTIONS)
     sequence_number = 1
-    for code_section_id in database.search_for_code_section_ids_in_order(db):
+    for code_section_id in database.code_section_ids_in_order(db):
         database.assign_code_section_sequence_number(db, code_section_id, sequence_number)
         sequence_number += 1
     set_parser_state(db, ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS)
@@ -115,7 +114,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
 def split_sections_into_fragment_streams(ctx):
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.SEQUENCE_NUMBERS_ASSIGNED_TO_CODE_SECTIONS)
-    for section_id, data in database.fetch_document_sections(db):
+    for section_id, data in database.document_sections_in_order(db):
         plain_text_start = 0
         for match in patterns.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
             # TODO: I'm starting to think escaped references are a bad idea.  Think about this.
@@ -142,14 +141,6 @@ def split_sections_into_fragment_streams(ctx):
     set_parser_state(db, ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS)
 
 
-def collect_full_section_names(ctx):
-    db = database.get_database_connection(ctx)
-    assert_parser_state(db, ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS)
-    full_section_names = set(database.search_for_unabbreviated_names(db))
-    database.insert_many_unabbreviated_names(db, full_section_names)
-    set_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
-
-
 def resolve_all_abbreviations(ctx):
     def fix_abbreviations(find, fix):
         for id_to_fix, name in find(db):
@@ -165,16 +156,17 @@ def resolve_all_abbreviations(ctx):
             fix(db, id_to_fix, full_names.pop())
 
     db = database.get_database_connection(ctx)
-    assert_parser_state(db, ParserState.FULL_SECTION_NAMES_COLLECTED)
-    fix_abbreviations(database.search_for_abbreviated_code_section_names, database.assign_code_section_name)
-    fix_abbreviations(database.search_for_abbreviated_reference_fragment_names, database.assign_reference_fragment_name)
+    assert_parser_state(db, ParserState.SECTIONS_SPLIT_INTO_FRAGMENT_STREAMS)
+    database.collect_all_unabbreviated_names(db)
+    fix_abbreviations(database.abbreviated_code_section_names, database.assign_code_section_name)
+    fix_abbreviations(database.abbreviated_reference_fragment_names, database.assign_reference_fragment_name)
     set_parser_state(db, ParserState.ALL_ABBREVIATIONS_RESOLVED)
 
 
 def group_fragment_streams_by_section_name(ctx):
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.ALL_ABBREVIATIONS_RESOLVED)
-    for name_id, name in database.fetch_unabbreviated_names(db):
+    for name_id, name in database.unabbreviated_names(db):
         database.assign_fragment_name_ids(db, name_id, name)
     set_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
 
@@ -195,7 +187,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
             database.insert_non_root_name(db_connection, name)
         if name in name_stack:
             raise errors.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
-        if not database.name_has_a_definition(db_connection, name):
+        if not database.is_name_defined_by_code_section(db_connection, name):
             raise errors.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
         name_stack.append(name)
 
@@ -231,7 +223,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
 
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
-    for code_section_name_id, code_section_name in database.fetch_unabbreviated_names(db, root_code_sections_only=True):
+    for code_section_name_id, code_section_name in database.unabbreviated_names(db, root_code_sections_only=True):
         # An output file should end with exactly one newline.
         code = coalesce_fragments(db, code_section_name).rstrip("\r\n") + "\n"
         database.insert_resolved_code_section(db, code_section_name_id, code)
@@ -243,7 +235,6 @@ def parse_source_file(ctx, db_path: str, root_source_file: Path):
     split_source_document_into_sections(ctx, root_source_file)
     assign_sequence_numbers_to_code_sections(ctx)
     split_sections_into_fragment_streams(ctx)
-    collect_full_section_names(ctx)
     resolve_all_abbreviations(ctx)
     group_fragment_streams_by_section_name(ctx)
     resolve_named_code_sections_into_plain_text(ctx)
@@ -252,4 +243,4 @@ def parse_source_file(ctx, db_path: str, root_source_file: Path):
 def get_code_files(ctx):
     db = database.get_database_connection(ctx)
     assert_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)
-    return dict(database.fetch_resolved_code_sections(db))
+    return dict(database.resolved_code_sections(db))
