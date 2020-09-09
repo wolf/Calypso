@@ -109,6 +109,14 @@ def insert_fragment(db: sqlite3.Connection, kind: str, parent_document_section_i
 
 
 def collect_all_unabbreviated_names(db: sqlite3.Connection):
+    """
+    Search among code-sections for those with unabbreviated names; then search among reference fragments for those whose
+    references are unabbreviated.  Save the found names in the code_sections_full_names table.
+
+    I would try to enforce order here so that the first found unabbreviated name then becomes the canonical version with
+    respect to capitalization; but that turns out to be hard to do in SQL.
+    """
+
     sql = """
         INSERT OR IGNORE INTO code_section_full_names (name)
         SELECT name
