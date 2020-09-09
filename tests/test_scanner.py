@@ -25,6 +25,11 @@ def read_golden_record(path: str):
     return golden_record
 
 
+# TODO: test no code-sections found fails
+# TODO: test case insensitive code-section names match
+# TODO: test first unabbreviated version of a name is the canonical case, can't possibly work!!!
+
+
 def test_get_roots(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-get-roots.w"))
     code_files = scanner.get_code_files(shared_context)
