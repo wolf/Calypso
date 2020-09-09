@@ -1,6 +1,6 @@
 import pytest
 
-from blue import database, errors, scanner
+from blue import db_gateway, errors, scanner
 
 
 @pytest.fixture()
@@ -14,7 +14,7 @@ def shared_context():
 
 @pytest.fixture()
 def db(shared_context):
-    return database.create_database(shared_context, ":memory:")
+    return db_gateway.create_database(shared_context, ":memory:")
 
 
 def test_initial_db_state(db):

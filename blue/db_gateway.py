@@ -196,7 +196,7 @@ def assign_fragment_name_ids(db: sqlite3.Connection, code_section_name_id: int, 
     db.execute(sql, (code_section_name_id, code_section_name))
 
 
-def search_for_fragments_belonging_to_this_name(db: sqlite3.Connection, code_section_name: str) -> Generator:
+def fragments_belonging_to_this_name_in_order(db: sqlite3.Connection, code_section_name: str) -> Generator:
     sql = """
         SELECT
             description AS kind,
