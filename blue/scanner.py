@@ -171,62 +171,64 @@ def group_fragment_streams_by_section_name(ctx):
     set_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
 
 
-def resolve_named_code_sections_into_plain_text(ctx):
-    def coalesce_fragments(
-        db_connection: sqlite3.Connection,
+def assemble_fragments_into_plain_text(
+        db: sqlite3.Connection,
         name: str,
         name_stack: Optional[List[str]] = None,
         hunk_in_progress: str = "",
         indent: str = "",
-    ) -> str:
+) -> str:
 
-        # Manage the stack of open code-section names.
-        if name_stack is None:
-            name_stack = []
-        else:
-            db_gateway.insert_non_root_name(db_connection, name)
-        if name in name_stack:
-            raise errors.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
-        if not db_gateway.is_name_defined_by_code_section(db_connection, name):
-            raise errors.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
-        name_stack.append(name)
+    # Manage the stack of open code-section names.
+    if name_stack is None:
+        name_stack = []
+    else:
+        db_gateway.insert_non_root_name(db, name)
+    if name in name_stack:
+        raise errors.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
+    if not db_gateway.is_name_defined_by_code_section(db, name):
+        raise errors.NoSuchCodeSectionError(f'Code-section "{name}" not found.')
+    name_stack.append(name)
 
-        document_section_separator = ""
-        current_parent_document_section_id = None
-        for (
+    document_section_separator = ""
+    current_parent_document_section_id = None
+    for (
             kind,
             parent_document_section_id,
             fragment_data,
             fragment_indent,
-        ) in db_gateway.fragments_belonging_to_this_name_in_order(db_connection, name):
-            if parent_document_section_id != current_parent_document_section_id:
-                hunk_in_progress += document_section_separator
-                document_section_separator = "\n"
-                current_parent_document_section_id = parent_document_section_id
-            if kind == "plain text":
-                needs_indent = hunk_in_progress.endswith("\n")
-                for line in fragment_data.splitlines(keepends=True):
-                    if needs_indent:
-                        hunk_in_progress += indent
-                    hunk_in_progress += line
-                    needs_indent = True
-            elif kind == "reference":
-                hunk_in_progress = coalesce_fragments(
-                    db_connection, fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
-                )
-            elif kind == "escaped reference":
-                hunk_in_progress += "<<" + fragment_data + ">>"
+    ) in db_gateway.fragments_belonging_to_this_name_in_order(db, name):
+        if parent_document_section_id != current_parent_document_section_id:
+            hunk_in_progress += document_section_separator
+            document_section_separator = "\n"
+            current_parent_document_section_id = parent_document_section_id
+        if kind == "plain text":
+            needs_indent = hunk_in_progress.endswith("\n")
+            for line in fragment_data.splitlines(keepends=True):
+                if needs_indent:
+                    hunk_in_progress += indent
+                hunk_in_progress += line
+                needs_indent = True
+        elif kind == "reference":
+            hunk_in_progress = assemble_fragments_into_plain_text(
+                db, fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
+            )
+        elif kind == "escaped reference":
+            # TODO: I'm really starting to hate escaped references...
+            hunk_in_progress += "<<" + fragment_data + ">>"
 
-        # Manage the stack of open code-section names.
-        name_stack.pop()
-        return hunk_in_progress
+    # Manage the stack of open code-section names.
+    name_stack.pop()
+    return hunk_in_progress
 
+
+def resolve_named_code_sections_into_plain_text(ctx):
     db = db_gateway.get_database_connection(ctx)
     assert_parser_state(db, ParserState.FRAGMENT_STREAMS_GROUPED_BY_SECTION_NAME)
-    for code_section_name_id, code_section_name in db_gateway.unabbreviated_names(db, root_code_sections_only=True):
+    for root_name_id, root_name in db_gateway.unabbreviated_names(db, roots_only=True):
         # An output file should end with exactly one newline.
-        code = coalesce_fragments(db, code_section_name).rstrip("\r\n") + "\n"
-        db_gateway.insert_resolved_code_section(db, code_section_name_id, code)
+        code = assemble_fragments_into_plain_text(db, root_name).rstrip("\r\n") + "\n"
+        db_gateway.insert_resolved_code_section(db, root_name_id, code)
     set_parser_state(db, ParserState.ROOT_CODE_SECTIONS_RESOLVED_INTO_PLAIN_TEXT)
 
 

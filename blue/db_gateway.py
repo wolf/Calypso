@@ -164,11 +164,11 @@ def abbreviated_reference_fragment_names(db: sqlite3.Connection) -> Generator:
         yield row
 
 
-def unabbreviated_names(db: sqlite3.Connection, root_code_sections_only: bool = False) -> Generator:
+def unabbreviated_names(db: sqlite3.Connection, roots_only: bool = False) -> Generator:
     sql = """
         SELECT id, name FROM code_section_full_names
     """
-    if root_code_sections_only:
+    if roots_only:
         sql += """
             EXCEPT
             SELECT id, name FROM non_root_code_sections
