@@ -98,12 +98,6 @@ def test_consecutive_section_includes(shared_context):
     assert code_files["generated_output"] == read_golden_record("tests/data/test-consecutive-section-includes")
 
 
-def test_escaped_references_are_not_expanded(shared_context):
-    scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-escaped-references-are-not-expanded.w"))
-    code_files = scanner.get_code_files(shared_context)
-    assert code_files["generated_output"] == read_golden_record("tests/data/test-escaped-references-are-not-expanded")
-
-
 def test_indentation_is_preserved(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-indentation-is-preserved.w"))
     code_files = scanner.get_code_files(shared_context)

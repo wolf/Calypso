@@ -27,8 +27,7 @@ CREATE TABLE fragment_kinds (
 );
 INSERT INTO fragment_kinds (description) VALUES
     ('plain text'),
-    ('reference'),
-    ('escaped reference')
+    ('reference')
 ;
 
 

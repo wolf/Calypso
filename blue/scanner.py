@@ -81,8 +81,6 @@ def split_sections_into_fragment_streams(ctx):
     for section_id, data in db_gateway.document_sections_in_order(db):
         plain_text_start = 0
         for match in patterns.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
-            # TODO: I'm starting to think escaped references are a bad idea.  Think about this.
-            reference_is_escaped = False
             reference_name = match.group("just_the_referenced_name").strip()
             if patterns.BAD_SECTION_NAME_PATTERN.search(reference_name):
                 raise errors.BadSectionNameError(
@@ -90,16 +88,10 @@ def split_sections_into_fragment_streams(ctx):
                 )
             indent = match.group("indent") or ""
             plain_text = data[plain_text_start : match.start("complete_reference")]
-            if plain_text.endswith("\\"):
-                reference_is_escaped = True
-                plain_text = plain_text[:-1]  # chop off the escape character '\'
             plain_text_start = match.end("complete_reference")
             if plain_text:
                 db_gateway.insert_fragment(db, "plain text", section_id, plain_text)
-            if reference_is_escaped:
-                db_gateway.insert_fragment(db, "escaped reference", section_id, reference_name)
-            else:
-                db_gateway.insert_fragment(db, "reference", section_id, reference_name, indent)
+            db_gateway.insert_fragment(db, "reference", section_id, reference_name, indent)
         if plain_text_start < len(data):
             db_gateway.insert_fragment(db, "plain text", section_id, data[plain_text_start:])
 
@@ -172,9 +164,6 @@ def assemble_fragments_into_plain_text(
             hunk_in_progress = assemble_fragments_into_plain_text(
                 db, fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
             )
-        elif kind == "escaped reference":
-            # TODO: I'm really starting to hate escaped references...
-            hunk_in_progress += "<<" + fragment_data + ">>"
 
     # Manage the stack of open code-section names.
     name_stack.pop()
