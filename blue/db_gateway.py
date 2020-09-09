@@ -214,6 +214,7 @@ def is_name_defined_by_code_section(db: sqlite3.Connection, name: str) -> bool:
         SELECT COUNT(*)
         FROM document_sections
         JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
-        WHERE name = ?
+        WHERE description = 'code'
+            AND name = ?
     """
     return db.execute(sql, (name,)).fetchone()[0] != 0
