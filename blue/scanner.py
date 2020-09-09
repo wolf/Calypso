@@ -76,7 +76,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
         sequence_number += 1
 
 
-def split_sections_into_fragment_streams(ctx):
+def split_document_sections_into_fragments(ctx):
     db = db_gateway.get_database_connection(ctx)
     for section_id, data in db_gateway.document_sections_in_order(db):
         plain_text_start = 0
@@ -116,7 +116,7 @@ def resolve_all_abbreviations(ctx):
     fix_abbreviations(db_gateway.abbreviated_reference_fragment_names, db_gateway.assign_reference_fragment_name)
 
 
-def group_fragment_streams_by_section_name(ctx):
+def group_fragments_by_section_name(ctx):
     db = db_gateway.get_database_connection(ctx)
     for name_id, name in db_gateway.unabbreviated_names(db):
         db_gateway.assign_fragment_name_ids(db, name_id, name)
@@ -182,9 +182,9 @@ def parse_source_file(ctx, db_path: str, root_source_file: Path):
     db_gateway.create_database(ctx, db_path)
     split_source_document_into_sections(ctx, root_source_file)
     assign_sequence_numbers_to_code_sections(ctx)
-    split_sections_into_fragment_streams(ctx)
+    split_document_sections_into_fragments(ctx)
     resolve_all_abbreviations(ctx)
-    group_fragment_streams_by_section_name(ctx)
+    group_fragments_by_section_name(ctx)
     resolve_named_code_sections_into_plain_text(ctx)
 
 
