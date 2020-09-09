@@ -43,7 +43,7 @@ def set_parser_state(db: sqlite3.Connection, new_parser_state: int):
     db.execute(sql, (new_parser_state,))
 
 
-def write_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: Optional[str] = None):
+def insert_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: Optional[str] = None):
     sql = """
         INSERT INTO document_sections (kind_id, is_included, name, data) VALUES (
             (SELECT id FROM document_section_kinds WHERE description = ?),
@@ -53,7 +53,7 @@ def write_document_section(db: sqlite3.Connection, kind: str, data: str, is_incl
     db.execute(sql, (kind, int(is_included), name, data))
 
 
-def read_document_sections(db: sqlite3.Connection) -> Generator:
+def fetch_document_sections(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT id, data FROM document_sections ORDER BY id
     """
@@ -74,7 +74,7 @@ def search_for_code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
         yield row["id"]
 
 
-def read_resolved_code_sections(db: sqlite3.Connection) -> Generator:
+def fetch_resolved_code_sections(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT name, code
         FROM resolved_code_sections
@@ -84,7 +84,7 @@ def read_resolved_code_sections(db: sqlite3.Connection) -> Generator:
         yield row
 
 
-def write_resolved_code_section(db: sqlite3.Connection, code_section_name_id: int, code: str):
+def insert_resolved_code_section(db: sqlite3.Connection, code_section_name_id: int, code: str):
     sql = """
         INSERT OR IGNORE INTO resolved_code_sections (code_section_name_id, code) VALUES (?, ?)
     """
@@ -112,7 +112,7 @@ def assign_reference_fragment_name(db: sqlite3.Connection, fragment_id: int, nam
     db.execute(sql, (name, fragment_id))
 
 
-def write_fragment(db: sqlite3.Connection, kind: str, parent_document_section_id: int, data: str, indent: str = ""):
+def insert_fragment(db: sqlite3.Connection, kind: str, parent_document_section_id: int, data: str, indent: str = ""):
     sql = """
         INSERT INTO fragments (kind_id, parent_document_section_id, data, indent) VALUES (
             (SELECT id FROM fragment_kinds WHERE description = ?),
@@ -164,14 +164,14 @@ def search_for_abbreviated_reference_fragment_names(db: sqlite3.Connection) -> G
         yield row
 
 
-def write_many_unabbreviated_names(db: sqlite3.Connection, names: Iterable):
+def insert_many_unabbreviated_names(db: sqlite3.Connection, names: Iterable):
     sql = """
         INSERT OR IGNORE INTO code_section_full_names (name) VALUES (?)
     """
     db.executemany(sql, [(name,) for name in names])
 
 
-def read_unabbreviated_names(db: sqlite3.Connection, root_code_sections_only: bool = False) -> Generator:
+def fetch_unabbreviated_names(db: sqlite3.Connection, root_code_sections_only: bool = False) -> Generator:
     sql = """
         SELECT id, name FROM code_section_full_names
     """
@@ -221,7 +221,7 @@ def search_for_fragments_belonging_to_this_name(db: sqlite3.Connection, code_sec
         yield row
 
 
-def write_non_root_name(db: sqlite3.Connection, name: str):
+def insert_non_root_name(db: sqlite3.Connection, name: str):
     sql = """
         INSERT OR IGNORE INTO non_root_code_sections (code_section_name_id)
         SELECT id FROM code_section_full_names WHERE name = ?
