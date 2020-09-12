@@ -58,7 +58,7 @@ def code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT code_section.id
         FROM document_section code_section
-        JOIN document_section_kind ON code_section.kind_id = document_section_kind.id
+        JOIN document_section_kind ON document_section_kind.id = code_section.kind_id
         WHERE document_section_kind.description = 'code'
             AND is_included = 0
         ORDER BY code_section.sequence
@@ -71,7 +71,7 @@ def resolved_code_sections(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT name, code
         FROM resolved_code_section
-        JOIN code_section_full_name ON code_section_name_id = id
+        JOIN code_section_full_name ON id = code_section_name_id
     """
     for row in db.execute(sql):
         yield row
@@ -135,13 +135,13 @@ def collect_all_unabbreviated_names(db: sqlite3.Connection):
         INSERT OR IGNORE INTO code_section_full_name (name)
         SELECT name
         FROM document_section
-        JOIN document_section_kind ON document_section.kind_id = document_section_kind.id
+        JOIN document_section_kind ON document_section_kind.id = document_section.kind_id
         WHERE description = 'code'
             AND name NOT LIKE '%...'
         UNION
         SELECT data AS name
         FROM fragment
-        JOIN fragment_kind ON fragment.kind_id = fragment_kind.id
+        JOIN fragment_kind ON fragment_kind.id = fragment.kind_id
         WHERE description = 'reference'
             AND data NOT LIKE '%...'
     """
@@ -152,7 +152,7 @@ def abbreviated_code_section_names(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT document_section.id, name
         FROM document_section
-        JOIN document_section_kind ON document_section.kind_id = document_section_kind.id
+        JOIN document_section_kind ON document_section_kind.id = document_section.kind_id
         WHERE description = 'code'
             AND name LIKE '%...'
     """
@@ -164,7 +164,7 @@ def abbreviated_reference_fragment_names(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT fragment.id, data AS name
         FROM fragment
-        JOIN fragment_kind ON fragment.kind_id = fragment_kind.id
+        JOIN fragment_kind ON fragment_kind.id = fragment.kind_id
         WHERE description = 'reference'
             AND data LIKE '%...'
     """
@@ -236,7 +236,7 @@ def is_name_defined_by_code_section(db: sqlite3.Connection, name: str) -> bool:
     sql = """
         SELECT COUNT(*)
         FROM document_section
-        JOIN document_section_kind ON document_section.kind_id = document_section_kind.id
+        JOIN document_section_kind ON document_section_kind.id = document_section.kind_id
         WHERE description = 'code'
             AND name = ?
     """
