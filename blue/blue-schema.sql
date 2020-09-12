@@ -15,6 +15,7 @@ CREATE TABLE document_sections (
    kind_id INTEGER NOT NULL,
    is_included INTEGER, -- 0 or 1 (because there is no BOOLEAN type)
    code_section_presentation_number INTEGER, -- will be NULL for kinds other than 'code'
+   sequence REAL,
    name TEXT COLLATE NOCASE, -- will be NULL for kinds other than code
    data TEXT
 );

@@ -1,3 +1,22 @@
+"""
+Parse a literate source file into its components, and save them to an intermediate database that can be shared.
+
+A literate source file is a sequence of sections.  Each section is either code or documentation.  Additionally, each
+single `@include(filename)` line is treated as its own section.  One section ends when another begins.  Code-sections
+start with a line that looks like this: `<<code-section name>>=` beginning in the left-most column.  Documentation-
+sections begin with a single `@` character alone on a line (no white-space, and in the left-most column).  The very
+first section is a documentation-section.  It needs no introduction.
+
+The documentation sections typically contain some kind of markup, e.g., Markdown, LaTeX, HTML, or even just plain text.
+
+The most important form of the source file, as it appears in the database, is as a collection of "fragments".  A
+fragment is either one contiguous hunk of plain text (which might contain either code or documentation, or perhaps
+something else in the future), or a reference to a named code-section.  In the latter case, the text of the fragment is
+the name itself.  Fragments know from which document-section they came; and since document-sections know whether they
+are code or documentation, you can tell what's in the fragment.  A fragment that belongs to a code-section also knows
+the name (via an id) of that code.
+"""
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Union
@@ -13,8 +32,10 @@ def split_source_document_into_sections(ctx, source_document: Path):
         data: str = ""
 
         def close(self, is_included):
+            nonlocal sequence
             if self.data:
-                db_gateway.insert_document_section(db, "documentation", self.data, is_included)
+                db_gateway.insert_document_section(db, "documentation", self.data, is_included, sequence=sequence)
+                sequence += 1.0
 
     @dataclass()
     class CodeSectionInProgress:
@@ -22,9 +43,11 @@ def split_source_document_into_sections(ctx, source_document: Path):
         data: str = ""
 
         def close(self, is_included):
+            nonlocal sequence
             if self.data.endswith("\n"):
                 self.data = self.data[:-1]
-            db_gateway.insert_document_section(db, "code", self.data, is_included, self.name)
+            db_gateway.insert_document_section(db, "code", self.data, is_included, self.name, sequence=sequence)
+            sequence += 1.0
 
     def scan_file(path: Path, path_stack: Optional[List[Path]] = None):
         # Manage the stack of open files.
@@ -65,6 +88,7 @@ def split_source_document_into_sections(ctx, source_document: Path):
         path_stack.pop()
 
     db = db_gateway.get_database_connection(ctx)
+    sequence = 0.0
     scan_file(source_document)
 
 
@@ -78,7 +102,7 @@ def assign_presentation_numbers_to_code_sections(ctx):
 
 def split_document_sections_into_fragments(ctx):
     db = db_gateway.get_database_connection(ctx)
-    sequence = 10.0
+    sequence = 0.0
     for section_id, data in db_gateway.document_sections_in_order(db):
         plain_text_start = 0
         for match in patterns.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
@@ -92,12 +116,12 @@ def split_document_sections_into_fragments(ctx):
             plain_text_start = match.end("complete_reference")
             if plain_text:
                 db_gateway.insert_fragment(db, "plain text", section_id, plain_text, sequence=sequence)
-                sequence += 10.0
+                sequence += 1.0
             db_gateway.insert_fragment(db, "reference", section_id, reference_name, indent, sequence=sequence)
-            sequence += 10.0
+            sequence += 1.0
         if plain_text_start < len(data):
             db_gateway.insert_fragment(db, "plain text", section_id, data[plain_text_start:], sequence=sequence)
-            sequence += 10.0
+            sequence += 1.0
 
 
 def resolve_all_abbreviations(ctx):

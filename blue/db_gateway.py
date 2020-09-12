@@ -29,19 +29,26 @@ def create_database(ctx, db_path: str) -> sqlite3.Connection:
     return db
 
 
-def insert_document_section(db: sqlite3.Connection, kind: str, data: str, is_included: bool, name: Optional[str] = None):
+def insert_document_section(
+        db: sqlite3.Connection,
+        kind: str,
+        data: str,
+        is_included: bool,
+        name: Optional[str] = None,
+        sequence: Optional[float] = None,
+):
     sql = """
-        INSERT INTO document_sections (kind_id, is_included, name, data) VALUES (
+        INSERT INTO document_sections (kind_id, is_included, name, data, sequence) VALUES (
             (SELECT id FROM document_section_kinds WHERE description = ?),
-            ?, ?, ?
+            ?, ?, ?, ?
         )
     """
-    db.execute(sql, (kind, int(is_included), name, data))
+    db.execute(sql, (kind, int(is_included), name, data, sequence))
 
 
 def document_sections_in_order(db: sqlite3.Connection) -> Generator:
     sql = """
-        SELECT id, data FROM document_sections ORDER BY id
+        SELECT id, data FROM document_sections ORDER BY sequence
     """
     for row in db.execute(sql):
         yield row
@@ -49,12 +56,12 @@ def document_sections_in_order(db: sqlite3.Connection) -> Generator:
 
 def code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
     sql = """
-        SELECT document_sections.id
-        FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
+        SELECT code_section.id
+        FROM document_sections code_section
+        JOIN document_section_kinds ON code_section.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'code'
             AND is_included = 0
-        ORDER BY document_sections.id
+        ORDER BY code_section.sequence
     """
     for row in db.execute(sql):
         yield row["id"]
@@ -202,14 +209,15 @@ def fragments_belonging_to_this_name_in_order(db: sqlite3.Connection, code_secti
         SELECT
             description AS kind,
             parent_document_section_id,
-            data,
+            fragments.data,
             indent
         FROM fragments
-        JOIN fragment_kinds ON fragments.kind_id = fragment_kinds.id
+        JOIN fragment_kinds ON fragment_kinds.id = fragments.kind_id
+        JOIN document_sections ON document_sections.id = parent_document_section_id
         WHERE code_section_name_id = (
             SELECT id FROM code_section_full_names WHERE name = ?
         )
-        ORDER BY parent_document_section_id, fragments.sequence
+        ORDER BY document_sections.sequence, fragments.sequence
     """
     for row in db.execute(sql, (code_section_name,)):
         yield row
