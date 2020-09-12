@@ -18,5 +18,5 @@ setup(
     entry_points="""
         [console_scripts]
         blue=blue.blue:blue
-    """
+    """,
 )

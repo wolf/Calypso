@@ -23,7 +23,9 @@ def blue(ctx, debug, verbose):
 @click.option("--base-dir", type=click.Path(file_okay=False, dir_okay=True, writable=True, readable=True))
 @click.option("--database", type=str, default=":memory:")
 @click.argument(
-    "file_paths", type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True), nargs=-1,
+    "file_paths",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True),
+    nargs=-1,
 )
 @click.pass_context
 def tangle(ctx, extract_only, file_paths, base_dir, database):
@@ -45,7 +47,9 @@ def tangle(ctx, extract_only, file_paths, base_dir, database):
 @click.option("--database", type=str, default=":memory:")
 @click.option("--output", "-o", type=click.Path(file_okay=True, writable=True))
 @click.argument(
-    "file_paths", type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True), nargs=-1,
+    "file_paths",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True),
+    nargs=-1,
 )
 @click.pass_context
 def weave(ctx, file_paths, base_dir, database, output):

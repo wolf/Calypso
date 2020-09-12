@@ -153,10 +153,10 @@ def test_included_section_name_is_abbreviated(shared_context):
     assert code_files["generated_output"] == read_golden_record("tests/data/test-included-section-name-is-abbreviated")
 
 
-def test_only_code_sections_are_assigned_sequence_numbers(shared_context):
+def test_only_code_sections_are_assigned_presentation_numbers(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
     db = db_gateway.get_database_connection(shared_context)
-    count_document_sections_with_sequence_numbers = """
+    count_document_sections_with_presentation_numbers = """
         SELECT count(*) AS count
         FROM document_section
         JOIN document_section_kind ON document_section_kind.id = document_section.kind_id
@@ -164,14 +164,14 @@ def test_only_code_sections_are_assigned_sequence_numbers(shared_context):
             AND document_section.code_section_presentation_number IS NOT NULL
     """
     with db_gateway.open_cursor(db) as section_reader:
-        section_reader.execute(count_document_sections_with_sequence_numbers)
+        section_reader.execute(count_document_sections_with_presentation_numbers)
         assert section_reader.fetchone()["count"] == 0
 
 
-def test_all_code_sections_are_assigned_sequence_numbers(shared_context):
+def test_all_code_sections_are_assigned_presentation_numbers(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
     db = db_gateway.get_database_connection(shared_context)
-    count_code_sections_without_sequence_numbers = """
+    count_code_sections_without_presentation_numbers = """
         SELECT count(*) AS count
         FROM document_section
         JOIN document_section_kind ON document_section_kind.id = document_section.kind_id
@@ -179,11 +179,11 @@ def test_all_code_sections_are_assigned_sequence_numbers(shared_context):
             AND document_section.code_section_presentation_number IS NULL
     """
     with db_gateway.open_cursor(db) as section_reader:
-        section_reader.execute(count_code_sections_without_sequence_numbers)
+        section_reader.execute(count_code_sections_without_presentation_numbers)
         assert section_reader.fetchone()["count"] == 0
 
 
-def test_sequence_numbers_are_in_order(shared_context):
+def test_presentation_numbers_are_in_order(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
     db = db_gateway.get_database_connection(shared_context)
     find_code_sections = """
@@ -195,17 +195,17 @@ def test_sequence_numbers_are_in_order(shared_context):
     """
     with db_gateway.open_cursor(db) as code_section_reader:
         code_section_reader.execute(find_code_sections)
-        required_sequence_number = 1
+        required_presentation_number = 1
         for row in code_section_reader.fetchall():
-            assert row["code_section_presentation_number"] == required_sequence_number
-            required_sequence_number += 1
+            assert row["code_section_presentation_number"] == required_presentation_number
+            required_presentation_number += 1
 
 
 def test_section_definition_is_abbreviated_but_included_section_is_not(shared_context):
     scanner.parse_source_file(
         shared_context,
         ":memory:",
-        Path("tests/data/test-section-definition-is-abbreviated-but-included-section-is-not.w")
+        Path("tests/data/test-section-definition-is-abbreviated-but-included-section-is-not.w"),
     )
     code_files = scanner.get_code_files(shared_context)
     assert code_files["generated_output"] == read_golden_record("tests/data/test-included-section-name-is-abbreviated")

@@ -30,12 +30,12 @@ def create_database(ctx, db_path: str) -> sqlite3.Connection:
 
 
 def insert_document_section(
-        db: sqlite3.Connection,
-        kind: str,
-        data: str,
-        is_included: bool,
-        name: Optional[str] = None,
-        sequence: Optional[float] = None,
+    db: sqlite3.Connection,
+    kind: str,
+    data: str,
+    is_included: bool,
+    name: Optional[str] = None,
+    sequence: Optional[float] = None,
 ):
     sql = """
         INSERT INTO document_section (kind_id, is_included, name, data, sequence) VALUES (
@@ -67,19 +67,19 @@ def code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
         yield row["id"]
 
 
-def resolved_code_sections(db: sqlite3.Connection) -> Generator:
+def resolved_code(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT name, code
-        FROM resolved_code_section
-        JOIN code_section_full_name ON id = code_section_name_id
+        FROM resolved_code
+        JOIN code_section_name ON id = name_id
     """
     for row in db.execute(sql):
         yield row
 
 
-def insert_resolved_code_section(db: sqlite3.Connection, code_section_name_id: int, code: str):
+def insert_resolved_code(db: sqlite3.Connection, code_section_name_id: int, code: str):
     sql = """
-        INSERT OR IGNORE INTO resolved_code_section (code_section_name_id, code) VALUES (?, ?)
+        INSERT OR IGNORE INTO resolved_code (name_id, code) VALUES (?, ?)
     """
     db.execute(sql, (code_section_name_id, code))
 
@@ -106,20 +106,20 @@ def assign_reference_fragment_name(db: sqlite3.Connection, fragment_id: int, nam
 
 
 def insert_fragment(
-        db: sqlite3.Connection,
-        kind: str,
-        parent_document_section_id: int,
-        data: str,
-        indent: str = "",
-        sequence: Optional[float] = None,
+    db: sqlite3.Connection,
+    kind: str,
+    parent_id: int,
+    data: str,
+    indent: str = "",
+    sequence: Optional[float] = None,
 ):
     sql = """
-        INSERT INTO fragment (kind_id, parent_document_section_id, data, indent, sequence) VALUES (
+        INSERT INTO fragment (kind_id, parent_id, data, indent, sequence) VALUES (
             (SELECT id FROM fragment_kind WHERE description = ?),
             ?, ?, ?, ?
         )
     """
-    db.execute(sql, (kind, parent_document_section_id, data, indent, sequence))
+    db.execute(sql, (kind, parent_id, data, indent, sequence))
 
 
 def collect_all_unabbreviated_names(db: sqlite3.Connection):
@@ -132,7 +132,7 @@ def collect_all_unabbreviated_names(db: sqlite3.Connection):
     """
 
     sql = """
-        INSERT OR IGNORE INTO code_section_full_name (name)
+        INSERT OR IGNORE INTO code_section_name (name)
         SELECT name
         FROM document_section
         JOIN document_section_kind ON document_section_kind.id = document_section.kind_id
@@ -174,13 +174,13 @@ def abbreviated_reference_fragment_names(db: sqlite3.Connection) -> Generator:
 
 def unabbreviated_names(db: sqlite3.Connection, roots_only: bool = False) -> Generator:
     sql = """
-        SELECT id, name FROM code_section_full_name
+        SELECT id, name FROM code_section_name
     """
     if roots_only:
         sql += """
             EXCEPT
-            SELECT id, name FROM non_root_code_section
-            JOIN code_section_full_name ON code_section_full_name.id = code_section_name_id
+            SELECT id, name FROM non_root_code_section_name
+            JOIN code_section_name ON code_section_name.id = name_id
         """
     for row in db.execute(sql):
         yield row
@@ -188,7 +188,7 @@ def unabbreviated_names(db: sqlite3.Connection, roots_only: bool = False) -> Gen
 
 def resolve_abbreviation(db: sqlite3.Connection, abbreviation: str) -> Generator:
     sql = """
-        SELECT name FROM code_section_full_name WHERE name LIKE ?||'%'
+        SELECT name FROM code_section_name WHERE name LIKE ?||'%'
     """
     for row in db.execute(sql, (abbreviation,)):
         yield row["name"]
@@ -196,8 +196,8 @@ def resolve_abbreviation(db: sqlite3.Connection, abbreviation: str) -> Generator
 
 def assign_fragment_name_ids(db: sqlite3.Connection, code_section_name_id: int, code_section_name: str):
     sql = """
-        UPDATE fragment SET code_section_name_id = ?
-        WHERE parent_document_section_id IN (
+        UPDATE fragment SET name_id = ?
+        WHERE parent_id IN (
             SELECT id FROM document_section WHERE name = ?
         )
     """
@@ -208,16 +208,16 @@ def fragments_belonging_to_this_name_in_order(db: sqlite3.Connection, code_secti
     sql = """
         SELECT
             description AS kind,
-            parent_document_section_id,
+            parent_id,
             fragment.data,
             indent
         FROM fragment
         JOIN fragment_kind ON fragment_kind.id = fragment.kind_id
-        JOIN document_section ON document_section.id = parent_document_section_id
-        WHERE code_section_name_id = (
-            SELECT id FROM code_section_full_name WHERE name = ?
+        JOIN document_section parent ON parent.id = parent_id
+        WHERE name_id = (
+            SELECT id FROM code_section_name WHERE name = ?
         )
-        ORDER BY document_section.sequence, fragment.sequence
+        ORDER BY parent.sequence, fragment.sequence
     """
     for row in db.execute(sql, (code_section_name,)):
         yield row
@@ -225,8 +225,8 @@ def fragments_belonging_to_this_name_in_order(db: sqlite3.Connection, code_secti
 
 def insert_non_root_name(db: sqlite3.Connection, name: str):
     sql = """
-        INSERT OR IGNORE INTO non_root_code_section (code_section_name_id)
-        SELECT id FROM code_section_full_name WHERE name = ?
+        INSERT OR IGNORE INTO non_root_code_section_name (name_id)
+        SELECT id FROM code_section_name WHERE name = ?
     """
     db.execute(sql, (name,))
 

@@ -54,7 +54,11 @@ def test_writes_multiple_files(output_root, manage_output, shared_context):
 
 def test_writes_select_files(output_root, manage_output, shared_context):
     code_files = get_code_files(shared_context, Path("tests/data/test-writes-multiple-files.w"))
-    write_code_files(shared_context, code_files, {"tests/output/test-writes-multiple-files2.out", "tests/output/test-writes-multiple-files3.out"})
+    write_code_files(
+        shared_context,
+        code_files,
+        {"tests/output/test-writes-multiple-files2.out", "tests/output/test-writes-multiple-files3.out"},
+    )
     assert not (output_root / "test-writes-multiple-files1.out").exists()
     assert (output_root / "test-writes-multiple-files2.out").exists()
     assert (output_root / "test-writes-multiple-files3.out").exists()

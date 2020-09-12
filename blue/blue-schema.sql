@@ -36,29 +36,29 @@ DROP TABLE IF EXISTS fragment;
 CREATE TABLE fragment (
    id INTEGER PRIMARY KEY NOT NULL,
    kind_id INTEGER NOT NULL,
-   parent_document_section_id INTEGER NOT NULL,
-   code_section_name_id INTEGER,
+   parent_id INTEGER NOT NULL,
+   name_id INTEGER,
    sequence REAL,
    data TEXT,
    indent TEXT
 );
 
 
-DROP TABLE IF EXISTS code_section_full_name;
-CREATE TABLE code_section_full_name (
+DROP TABLE IF EXISTS code_section_name;
+CREATE TABLE code_section_name (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE COLLATE NOCASE
 );
 
 
-DROP TABLE IF EXISTS non_root_code_section;
-CREATE TABLE non_root_code_section (
-    code_section_name_id INTEGER NOT NULL UNIQUE
+DROP TABLE IF EXISTS non_root_code_section_name;
+CREATE TABLE non_root_code_section_name (
+    name_id INTEGER NOT NULL UNIQUE
 );
 
 
-DROP TABLE IF EXISTS resolved_code_section;
-CREATE TABLE resolved_code_section (
-    code_section_name_id INTEGER NOT NULL UNIQUE,
+DROP TABLE IF EXISTS resolved_code;
+CREATE TABLE resolved_code (
+    name_id INTEGER NOT NULL UNIQUE,
     code TEXT NOT NULL
 );

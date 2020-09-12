@@ -59,7 +59,9 @@ def split_source_document_into_sections(ctx, source_document: Path):
         path_stack.append(path)
 
         with open(path, "r") as f:
-            current_section: Union[CodeSectionInProgress, DocumentationSectionInProgress] = DocumentationSectionInProgress()
+            current_section: Union[
+                DocumentationSectionInProgress, CodeSectionInProgress
+            ] = DocumentationSectionInProgress()
             for line in f:
                 if match := patterns.CODE_BLOCK_START_PATTERN.match(line):
                     current_section.close(is_included)
@@ -133,9 +135,7 @@ def resolve_all_abbreviations(ctx):
                 message = "does not identify any code-section."
                 if number_of_matches > 1:
                     message = f"matches multiple code-sections -- {full_names}."
-                raise errors.NonUniqueAbbreviationError(
-                    f'The abbreviation "{name}" ' + message
-                )
+                raise errors.NonUniqueAbbreviationError(f'The abbreviation "{name}" ' + message)
             fix_f(db, id_to_fix, full_names.pop())
 
     db = db_gateway.get_database_connection(ctx)
@@ -151,11 +151,11 @@ def group_fragments_by_section_name(ctx):
 
 
 def assemble_fragments_into_plain_text(
-        db: sqlite3.Connection,
-        name: str,
-        name_stack: Optional[List[str]] = None,
-        hunk_in_progress: str = "",
-        indent: str = "",
+    db: sqlite3.Connection,
+    name: str,
+    name_stack: Optional[List[str]] = None,
+    hunk_in_progress: str = "",
+    indent: str = "",
 ) -> str:
 
     # Manage the stack of open code-section names.
@@ -170,17 +170,17 @@ def assemble_fragments_into_plain_text(
     name_stack.append(name)
 
     document_section_separator = ""
-    current_parent_document_section_id = None
+    current_parent_id = None
     for (
-            kind,
-            parent_document_section_id,
-            fragment_data,
-            fragment_indent,
+        kind,
+        parent_id,
+        fragment_data,
+        fragment_indent,
     ) in db_gateway.fragments_belonging_to_this_name_in_order(db, name):
-        if parent_document_section_id != current_parent_document_section_id:
+        if parent_id != current_parent_id:
             hunk_in_progress += document_section_separator
             document_section_separator = "\n"
-            current_parent_document_section_id = parent_document_section_id
+            current_parent_id = parent_id
         if kind == "plain text":
             needs_indent = hunk_in_progress.endswith("\n")
             for line in fragment_data.splitlines(keepends=True):
@@ -203,7 +203,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
     for root_name_id, root_name in db_gateway.unabbreviated_names(db, roots_only=True):
         # An output file should end with exactly one newline.
         code = assemble_fragments_into_plain_text(db, root_name).rstrip("\r\n") + "\n"
-        db_gateway.insert_resolved_code_section(db, root_name_id, code)
+        db_gateway.insert_resolved_code(db, root_name_id, code)
 
 
 def parse_source_file(ctx, db_path: str, root_source_file: Path):
@@ -218,4 +218,4 @@ def parse_source_file(ctx, db_path: str, root_source_file: Path):
 
 def get_code_files(ctx):
     db = db_gateway.get_database_connection(ctx)
-    return dict(db_gateway.resolved_code_sections(db))
+    return dict(db_gateway.resolved_code(db))
