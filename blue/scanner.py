@@ -68,12 +68,12 @@ def split_source_document_into_sections(ctx, source_document: Path):
     scan_file(source_document)
 
 
-def assign_sequence_numbers_to_code_sections(ctx):
+def assign_presentation_numbers_to_code_sections(ctx):
     db = db_gateway.get_database_connection(ctx)
-    sequence_number = 1
+    presentation_number = 1
     for code_section_id in db_gateway.code_section_ids_in_order(db):
-        db_gateway.assign_code_section_sequence_number(db, code_section_id, sequence_number)
-        sequence_number += 1
+        db_gateway.assign_code_section_presentation_number(db, code_section_id, presentation_number)
+        presentation_number += 1
 
 
 def split_document_sections_into_fragments(ctx):
@@ -185,7 +185,7 @@ def resolve_named_code_sections_into_plain_text(ctx):
 def parse_source_file(ctx, db_path: str, root_source_file: Path):
     db_gateway.create_database(ctx, db_path)
     split_source_document_into_sections(ctx, root_source_file)
-    assign_sequence_numbers_to_code_sections(ctx)
+    assign_presentation_numbers_to_code_sections(ctx)
     split_document_sections_into_fragments(ctx)
     resolve_all_abbreviations(ctx)
     group_fragments_by_section_name(ctx)

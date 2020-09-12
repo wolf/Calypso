@@ -161,7 +161,7 @@ def test_only_code_sections_are_assigned_sequence_numbers(shared_context):
         FROM document_sections
         JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'documentation'
-            AND document_sections.code_section_sequence_number IS NOT NULL
+            AND document_sections.code_section_presentation_number IS NOT NULL
     """
     with db_gateway.open_cursor(db) as section_reader:
         section_reader.execute(count_document_sections_with_sequence_numbers)
@@ -176,7 +176,7 @@ def test_all_code_sections_are_assigned_sequence_numbers(shared_context):
         FROM document_sections
         JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'code'
-            AND document_sections.code_section_sequence_number IS NULL
+            AND document_sections.code_section_presentation_number IS NULL
     """
     with db_gateway.open_cursor(db) as section_reader:
         section_reader.execute(count_code_sections_without_sequence_numbers)
@@ -187,7 +187,7 @@ def test_sequence_numbers_are_in_order(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
     db = db_gateway.get_database_connection(shared_context)
     find_code_sections = """
-        SELECT document_sections.id, code_section_sequence_number
+        SELECT document_sections.id, code_section_presentation_number
         FROM document_sections
         JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
         WHERE document_section_kinds.description = 'code'
@@ -197,7 +197,7 @@ def test_sequence_numbers_are_in_order(shared_context):
         code_section_reader.execute(find_code_sections)
         required_sequence_number = 1
         for row in code_section_reader.fetchall():
-            assert row["code_section_sequence_number"] == required_sequence_number
+            assert row["code_section_presentation_number"] == required_sequence_number
             required_sequence_number += 1
 
 

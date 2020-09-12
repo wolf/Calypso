@@ -77,11 +77,11 @@ def insert_resolved_code_section(db: sqlite3.Connection, code_section_name_id: i
     db.execute(sql, (code_section_name_id, code))
 
 
-def assign_code_section_sequence_number(db: sqlite3.Connection, code_section_id: int, sequence_number: int):
+def assign_code_section_presentation_number(db: sqlite3.Connection, code_section_id: int, presentation_number: int):
     sql = """
-        UPDATE document_sections SET code_section_sequence_number = ? WHERE id = ?
+        UPDATE document_sections SET code_section_presentation_number = ? WHERE id = ?
     """
-    db.execute(sql, (sequence_number, code_section_id))
+    db.execute(sql, (presentation_number, code_section_id))
 
 
 def assign_code_section_name(db: sqlite3.Connection, code_section_id: int, name: str):
