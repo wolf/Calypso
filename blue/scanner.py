@@ -78,6 +78,7 @@ def assign_sequence_numbers_to_code_sections(ctx):
 
 def split_document_sections_into_fragments(ctx):
     db = db_gateway.get_database_connection(ctx)
+    sequence = 10.0
     for section_id, data in db_gateway.document_sections_in_order(db):
         plain_text_start = 0
         for match in patterns.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
@@ -90,10 +91,13 @@ def split_document_sections_into_fragments(ctx):
             plain_text = data[plain_text_start : match.start("complete_reference")]
             plain_text_start = match.end("complete_reference")
             if plain_text:
-                db_gateway.insert_fragment(db, "plain text", section_id, plain_text)
-            db_gateway.insert_fragment(db, "reference", section_id, reference_name, indent)
+                db_gateway.insert_fragment(db, "plain text", section_id, plain_text, sequence=sequence)
+                sequence += 10.0
+            db_gateway.insert_fragment(db, "reference", section_id, reference_name, indent, sequence=sequence)
+            sequence += 10.0
         if plain_text_start < len(data):
-            db_gateway.insert_fragment(db, "plain text", section_id, data[plain_text_start:])
+            db_gateway.insert_fragment(db, "plain text", section_id, data[plain_text_start:], sequence=sequence)
+            sequence += 10.0
 
 
 def resolve_all_abbreviations(ctx):

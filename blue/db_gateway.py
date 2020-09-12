@@ -98,14 +98,21 @@ def assign_reference_fragment_name(db: sqlite3.Connection, fragment_id: int, nam
     db.execute(sql, (name, fragment_id))
 
 
-def insert_fragment(db: sqlite3.Connection, kind: str, parent_document_section_id: int, data: str, indent: str = ""):
+def insert_fragment(
+        db: sqlite3.Connection,
+        kind: str,
+        parent_document_section_id: int,
+        data: str,
+        indent: str = "",
+        sequence: Optional[float] = None,
+):
     sql = """
-        INSERT INTO fragments (kind_id, parent_document_section_id, data, indent) VALUES (
+        INSERT INTO fragments (kind_id, parent_document_section_id, data, indent, sequence) VALUES (
             (SELECT id FROM fragment_kinds WHERE description = ?),
-            ?, ?, ?
+            ?, ?, ?, ?
         )
     """
-    db.execute(sql, (kind, parent_document_section_id, data, indent))
+    db.execute(sql, (kind, parent_document_section_id, data, indent, sequence))
 
 
 def collect_all_unabbreviated_names(db: sqlite3.Connection):
@@ -202,7 +209,7 @@ def fragments_belonging_to_this_name_in_order(db: sqlite3.Connection, code_secti
         WHERE code_section_name_id = (
             SELECT id FROM code_section_full_names WHERE name = ?
         )
-        ORDER BY parent_document_section_id, fragments.id
+        ORDER BY parent_document_section_id, fragments.sequence
     """
     for row in db.execute(sql, (code_section_name,)):
         yield row

@@ -37,6 +37,7 @@ CREATE TABLE fragments (
    kind_id INTEGER NOT NULL,
    parent_document_section_id INTEGER NOT NULL,
    code_section_name_id INTEGER,
+   sequence REAL,
    data TEXT,
    indent TEXT
 );
