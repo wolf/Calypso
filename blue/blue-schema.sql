@@ -1,16 +1,16 @@
-DROP TABLE IF EXISTS document_section_kinds;
-CREATE TABLE document_section_kinds (
+DROP TABLE IF EXISTS document_section_kind;
+CREATE TABLE document_section_kind (
     id INTEGER PRIMARY KEY NOT NULL,
     description TEXT NOT NULL
 );
-INSERT INTO document_section_kinds (description) VALUES
+INSERT INTO document_section_kind (description) VALUES
     ('documentation'),
     ('code')
 ;
 
 
-DROP TABLE IF EXISTS document_sections;
-CREATE TABLE document_sections (
+DROP TABLE IF EXISTS document_section;
+CREATE TABLE document_section (
    id INTEGER PRIMARY KEY NOT NULL,
    kind_id INTEGER NOT NULL,
    is_included INTEGER, -- 0 or 1 (because there is no BOOLEAN type)
@@ -21,19 +21,19 @@ CREATE TABLE document_sections (
 );
 
 
-DROP TABLE IF EXISTS fragment_kinds;
-CREATE TABLE fragment_kinds (
+DROP TABLE IF EXISTS fragment_kind;
+CREATE TABLE fragment_kind (
     id INTEGER PRIMARY KEY NOT NULL,
     description TEXT NOT NULL
 );
-INSERT INTO fragment_kinds (description) VALUES
+INSERT INTO fragment_kind (description) VALUES
     ('plain text'),
     ('reference')
 ;
 
 
-DROP TABLE IF EXISTS fragments;
-CREATE TABLE fragments (
+DROP TABLE IF EXISTS fragment;
+CREATE TABLE fragment (
    id INTEGER PRIMARY KEY NOT NULL,
    kind_id INTEGER NOT NULL,
    parent_document_section_id INTEGER NOT NULL,
@@ -44,21 +44,21 @@ CREATE TABLE fragments (
 );
 
 
-DROP TABLE IF EXISTS code_section_full_names;
-CREATE TABLE code_section_full_names (
+DROP TABLE IF EXISTS code_section_full_name;
+CREATE TABLE code_section_full_name (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE COLLATE NOCASE
 );
 
 
-DROP TABLE IF EXISTS non_root_code_sections;
-CREATE TABLE non_root_code_sections (
+DROP TABLE IF EXISTS non_root_code_section;
+CREATE TABLE non_root_code_section (
     code_section_name_id INTEGER NOT NULL UNIQUE
 );
 
 
-DROP TABLE IF EXISTS resolved_code_sections;
-CREATE TABLE resolved_code_sections (
+DROP TABLE IF EXISTS resolved_code_section;
+CREATE TABLE resolved_code_section (
     code_section_name_id INTEGER NOT NULL UNIQUE,
     code TEXT NOT NULL
 );

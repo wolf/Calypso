@@ -158,10 +158,10 @@ def test_only_code_sections_are_assigned_sequence_numbers(shared_context):
     db = db_gateway.get_database_connection(shared_context)
     count_document_sections_with_sequence_numbers = """
         SELECT count(*) AS count
-        FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
-        WHERE document_section_kinds.description = 'documentation'
-            AND document_sections.code_section_presentation_number IS NOT NULL
+        FROM document_section
+        JOIN document_section_kind ON document_section.kind_id = document_section_kind.id
+        WHERE document_section_kind.description = 'documentation'
+            AND document_section.code_section_presentation_number IS NOT NULL
     """
     with db_gateway.open_cursor(db) as section_reader:
         section_reader.execute(count_document_sections_with_sequence_numbers)
@@ -173,10 +173,10 @@ def test_all_code_sections_are_assigned_sequence_numbers(shared_context):
     db = db_gateway.get_database_connection(shared_context)
     count_code_sections_without_sequence_numbers = """
         SELECT count(*) AS count
-        FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
-        WHERE document_section_kinds.description = 'code'
-            AND document_sections.code_section_presentation_number IS NULL
+        FROM document_section
+        JOIN document_section_kind ON document_section.kind_id = document_section_kind.id
+        WHERE document_section_kind.description = 'code'
+            AND document_section.code_section_presentation_number IS NULL
     """
     with db_gateway.open_cursor(db) as section_reader:
         section_reader.execute(count_code_sections_without_sequence_numbers)
@@ -187,11 +187,11 @@ def test_sequence_numbers_are_in_order(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
     db = db_gateway.get_database_connection(shared_context)
     find_code_sections = """
-        SELECT document_sections.id, code_section_presentation_number
-        FROM document_sections
-        JOIN document_section_kinds ON document_sections.kind_id = document_section_kinds.id
-        WHERE document_section_kinds.description = 'code'
-        ORDER BY document_sections.id
+        SELECT document_section.id, code_section_presentation_number
+        FROM document_section
+        JOIN document_section_kind ON document_section.kind_id = document_section_kind.id
+        WHERE document_section_kind.description = 'code'
+        ORDER BY document_section.id
     """
     with db_gateway.open_cursor(db) as code_section_reader:
         code_section_reader.execute(find_code_sections)
