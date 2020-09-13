@@ -1,13 +1,15 @@
 """
 Parse a literate source file into its components, and save them to an intermediate database that can be shared.
 
-A literate source file is a sequence of sections.  Each section is either code or documentation.  Additionally, each
-single `@include(filename)` line is treated as its own section.  One section ends when another begins.  Code-sections
-start with a line that looks like this: `<<code-section name>>=` beginning in the left-most column.  Documentation-
-sections begin with a single `@` character alone on a line (no white-space, and in the left-most column).  The very
-first section is a documentation-section.  It needs no introduction.
+A literate source file is a sequence of sections.  Each section is either code or documentation.  One section ends when
+another begins.  Code-sections start with a line that looks like this: `<<code-section name>>=` beginning in the
+left-most column.  Documentation-sections begin with a single `@` character alone on a line (no white-space, and in the
+left-most column).  The very first section is a documentation-section.  It needs no introduction.  Code and
+documentation sections don't necessarily alternate.  Code-sections can immediately follow code-sections.  Likewise for
+documentation.  Empty documentation-sections can be discarded.
 
-The documentation sections typically contain some kind of markup, e.g., Markdown, LaTeX, HTML, or even just plain text.
+The documentation-sections typically contain some kind of markup, e.g., Markdown, LaTeX, HTML, or even just plain text.
+The code-sections can contain different languages.
 
 The most important form of the source file, as it appears in the database, is as a collection of "fragments".  A
 fragment is either one contiguous hunk of plain text (which might contain either code or documentation, or perhaps
@@ -195,6 +197,7 @@ def assemble_fragments_into_plain_text(
             hunk_in_progress = assemble_fragments_into_plain_text(
                 db, fragment_data, name_stack, hunk_in_progress, indent + fragment_indent
             )
+        # TODO: raise an error if kind is something else?
 
     # Manage the stack of open code-section names.
     name_stack.pop()

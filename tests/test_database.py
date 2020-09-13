@@ -20,11 +20,7 @@ def db(shared_context):
 
 
 def test_can_get_just_root_names(shared_context):
-    scanner.parse_source_file(
-        shared_context,
-        "test_names.sqlite",
-        Path("tests/data/test-code-section-sequence-numbers.w")
-    )
+    scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
     db = db_gateway.get_database_connection(shared_context)
     all_names = dict(db_gateway.unabbreviated_names(db))
     root_names = dict(db_gateway.unabbreviated_names(db, roots_only=True))
