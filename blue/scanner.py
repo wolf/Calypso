@@ -105,7 +105,7 @@ def assign_presentation_numbers_to_code_sections(ctx):
 def split_document_sections_into_fragments(ctx):
     db = db_gateway.get_database_connection(ctx)
     sequence = 0.0
-    for section_id, data in db_gateway.document_sections_in_order(db):
+    for section_id, data in db_gateway.raw_document_sections_in_order(db):
         plain_text_start = 0
         for match in patterns.CODE_BLOCK_REFERENCE_PATTERN.finditer(data):
             reference_name = match.group("just_the_referenced_name").strip()
@@ -146,8 +146,13 @@ def resolve_all_abbreviations(ctx):
 
 def group_fragments_by_section_name(ctx):
     db = db_gateway.get_database_connection(ctx)
-    for name_id, name in db_gateway.unabbreviated_names(db):
-        db_gateway.assign_fragment_name_ids(db, name_id, name)
+    for parent_name_id, name in db_gateway.unabbreviated_names(db):
+        db_gateway.assign_fragment_parent_name_ids(db, parent_name_id, name)
+
+
+def collect_non_root_names(ctx):
+    db = db_gateway.get_database_connection(ctx)
+    db_gateway.collect_non_root_names(db)
 
 
 def assemble_fragments_into_plain_text(
@@ -161,8 +166,6 @@ def assemble_fragments_into_plain_text(
     # Manage the stack of open code-section names.
     if name_stack is None:
         name_stack = []
-    else:
-        db_gateway.insert_non_root_name(db, name)
     if name in name_stack:
         raise errors.CodeSectionRecursionError(f'Code-section "{name}" recursively includes itself.')
     if not db_gateway.is_name_defined_by_code_section(db, name):
@@ -200,10 +203,14 @@ def assemble_fragments_into_plain_text(
 
 def resolve_named_code_sections_into_plain_text(ctx):
     db = db_gateway.get_database_connection(ctx)
+    found_any_roots = False
     for root_name_id, root_name in db_gateway.unabbreviated_names(db, roots_only=True):
         # An output file should end with exactly one newline.
         code = assemble_fragments_into_plain_text(db, root_name).rstrip("\r\n") + "\n"
         db_gateway.insert_resolved_code(db, root_name_id, code)
+        found_any_roots = True
+    if not found_any_roots:
+        raise errors.NoRootCodeSectionsFoundError("No root code sections found.")
 
 
 def parse_source_file(ctx, db_path: str, root_source_file: Path):
@@ -213,6 +220,7 @@ def parse_source_file(ctx, db_path: str, root_source_file: Path):
     split_document_sections_into_fragments(ctx)
     resolve_all_abbreviations(ctx)
     group_fragments_by_section_name(ctx)
+    collect_non_root_names(ctx)
     resolve_named_code_sections_into_plain_text(ctx)
 
 

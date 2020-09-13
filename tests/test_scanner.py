@@ -201,6 +201,12 @@ def test_presentation_numbers_are_in_order(shared_context):
             required_presentation_number += 1
 
 
+def test_only_roots_are_finally_resolved(shared_context):
+    scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-code-section-sequence-numbers.w"))
+    code_files = scanner.get_code_files(shared_context)
+    assert len(code_files) == 1
+
+
 def test_section_definition_is_abbreviated_but_included_section_is_not(shared_context):
     scanner.parse_source_file(
         shared_context,
@@ -248,5 +254,5 @@ def test_recursive_include_files_fail(shared_context):
 def test_recursive_sections_fail(shared_context):
     with pytest.raises(errors.CodeSectionRecursionError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-recursive-sections-fail.w"))
-    with pytest.raises(errors.CodeSectionRecursionError):
+    with pytest.raises(errors.NoRootCodeSectionsFoundError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-no-roots-means-recursion.w"))

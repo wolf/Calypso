@@ -37,7 +37,7 @@ CREATE TABLE fragment (
    id INTEGER PRIMARY KEY NOT NULL,
    kind_id INTEGER NOT NULL,
    parent_id INTEGER NOT NULL,
-   name_id INTEGER,
+   parent_name_id INTEGER,
    sequence REAL,
    data TEXT,
    indent TEXT
