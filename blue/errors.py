@@ -16,7 +16,6 @@ class NoSuchCodeSectionError(BlueScannerError):
 
 
 class NoRootCodeSectionsFoundError(BlueScannerError):
-    # deprecated
     pass
 
 
