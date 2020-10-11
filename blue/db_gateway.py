@@ -40,10 +40,10 @@ def insert_document_section(
     sql = """
         INSERT INTO document_section (kind_id, is_included, name, data, sequence) VALUES (
             (SELECT id FROM document_section_kind WHERE description = :kind),
-            :is_included, :name, :data, :sequence
+            :_is_included, :name, :data, :sequence
         )
     """
-    is_included = int(is_included)
+    _is_included = int(is_included)
     db.execute(sql, locals())
 
 
