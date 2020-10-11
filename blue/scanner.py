@@ -129,8 +129,8 @@ def split_document_sections_into_fragments(ctx):
 
 
 def resolve_all_abbreviations(ctx):
-    def fix_abbreviations(find_f, fix_f):
-        for id_to_fix, name in find_f(db):
+    def fix_abbreviations(find_fn, fix_fn):
+        for id_to_fix, name in find_fn(db):
             abbreviated_name = name[:-3]  # chop off the trailing '...'
             full_names = set(db_gateway.resolve_abbreviation(db, abbreviated_name))
             if (number_of_matches := len(full_names)) != 1:
@@ -138,7 +138,7 @@ def resolve_all_abbreviations(ctx):
                 if number_of_matches > 1:
                     message = f"matches multiple code-sections -- {full_names}."
                 raise errors.NonUniqueAbbreviationError(f'The abbreviation "{name}" ' + message)
-            fix_f(db, id_to_fix, full_names.pop())
+            fix_fn(db, id_to_fix, full_names.pop())
 
     db = db_gateway.get_database_connection(ctx)
     db_gateway.collect_all_unabbreviated_names(db)
