@@ -47,6 +47,14 @@ def insert_document_section(
     db.execute(sql, locals())
 
 
+def raw_document_sections_in_order(db: sqlite3.Connection) -> Generator:
+    sql = """
+        SELECT id, data FROM document_section ORDER BY sequence
+    """
+    for row in db.execute(sql):
+        yield row
+
+
 def document_sections_in_order(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT
@@ -57,14 +65,6 @@ def document_sections_in_order(db: sqlite3.Connection) -> Generator:
         FROM document_section
         JOIN document_section_kind ON document_section_kind.id = document_section.kind_id
         ORDER BY sequence
-    """
-    for row in db.execute(sql):
-        yield row
-
-
-def raw_document_sections_in_order(db: sqlite3.Connection) -> Generator:
-    sql = """
-        SELECT id, data FROM document_section ORDER BY sequence
     """
     for row in db.execute(sql):
         yield row
@@ -83,6 +83,20 @@ def code_section_ids_in_order(db: sqlite3.Connection) -> Generator:
         yield row["id"]
 
 
+def assign_code_section_presentation_number(db: sqlite3.Connection, code_section_id: int, presentation_number: int):
+    sql = """
+        UPDATE document_section SET code_section_presentation_number = :presentation_number WHERE id = :code_section_id
+    """
+    db.execute(sql, locals())
+
+
+def assign_code_section_name(db: sqlite3.Connection, code_section_id: int, name: str):
+    sql = """
+        UPDATE document_section SET name = :name WHERE id = :code_section_id
+    """
+    db.execute(sql, locals())
+
+
 def resolved_code(db: sqlite3.Connection) -> Generator:
     sql = """
         SELECT name, code
@@ -96,20 +110,6 @@ def resolved_code(db: sqlite3.Connection) -> Generator:
 def insert_resolved_code(db: sqlite3.Connection, code_section_name_id: int, code: str):
     sql = """
         INSERT OR IGNORE INTO resolved_code (name_id, code) VALUES (:code_section_name_id, :code)
-    """
-    db.execute(sql, locals())
-
-
-def assign_code_section_presentation_number(db: sqlite3.Connection, code_section_id: int, presentation_number: int):
-    sql = """
-        UPDATE document_section SET code_section_presentation_number = :presentation_number WHERE id = :code_section_id
-    """
-    db.execute(sql, locals())
-
-
-def assign_code_section_name(db: sqlite3.Connection, code_section_id: int, name: str):
-    sql = """
-        UPDATE document_section SET name = :name WHERE id = :code_section_id
     """
     db.execute(sql, locals())
 
@@ -239,28 +239,16 @@ def fragments_belonging_to_this_name_in_order(db: sqlite3.Connection, code_secti
         yield row
 
 
-def fragments_belonging_to_this_parent_in_order(db: sqlite3.Connection, section_id: int) -> Generator:
-    sql = """
-        SELECT
-            description AS kind,
-            fragment.data
-        FROM fragment
-        JOIN fragment_kind on fragment.kind_id = fragment_kind.id
-        WHERE parent_id = :section_id
-    """
-    for row in db.execute(sql, locals()):
-        yield row
-
-
-def insert_non_root_name(db: sqlite3.Connection, name: str):
-    sql = """
-        INSERT OR IGNORE INTO non_root_code_section_name (name_id)
-        SELECT id FROM code_section_name WHERE name = :name
-    """
-    db.execute(sql, locals())
-
-
 def collect_non_root_names(db: sqlite3.Connection):
+    """
+    A reference-fragment is simply the name of a code-section to insert at that point in the document.  Any code-section
+    name mentioned by a reference-fragment is therefore not a root (as long as the mention is from within another
+    code-section, not a documentation-section).
+
+    For all reference-fragments that are children of code-sections, lookup the name they mention and insert the found id
+    into the `non_root_code_section_name` table.
+    """
+
     sql = """
         INSERT OR IGNORE INTO non_root_code_section_name (name_id)
         SELECT code_section_name.id
