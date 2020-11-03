@@ -1,5 +1,6 @@
 # To Do...
 
+* Write a fully-fledged literate program to use as input
 * Add logging
 * Settle on a verb from: scan, read, parse and stick to it
 * Add doc-strings
