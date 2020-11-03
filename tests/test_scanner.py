@@ -254,3 +254,8 @@ def test_recursive_sections_fail(shared_context):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-recursive-sections-fail.w"))
     with pytest.raises(errors.NoRootCodeSectionsFoundError):
         scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-no-roots-means-recursion.w"))
+
+
+def test_no_code_sections_at_all_fails(shared_context):
+    with pytest.raises(errors.NoRootCodeSectionsFoundError):
+        scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-no-code-sections-at-all-fails.w"))
