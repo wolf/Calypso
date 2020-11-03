@@ -195,10 +195,8 @@ def test_presentation_numbers_are_in_order(shared_context):
     """
     with db_gateway.open_cursor(db) as code_section_reader:
         code_section_reader.execute(find_code_sections)
-        required_presentation_number = 1
-        for row in code_section_reader.fetchall():
+        for required_presentation_number, row in enumerate(code_section_reader.fetchall(), 1):
             assert row["code_section_presentation_number"] == required_presentation_number
-            required_presentation_number += 1
 
 
 def test_only_roots_are_finally_resolved(shared_context):

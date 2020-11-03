@@ -98,10 +98,8 @@ def split_source_document_into_sections(ctx, source_document: Path):
 
 def assign_presentation_numbers_to_code_sections(ctx):
     db = db_gateway.get_database_connection(ctx)
-    presentation_number = 1
-    for code_section_id in db_gateway.code_section_ids_in_order(db):
+    for presentation_number, code_section_id in enumerate(db_gateway.code_section_ids_in_order(db), 1):
         db_gateway.assign_code_section_presentation_number(db, code_section_id, presentation_number)
-        presentation_number += 1
 
 
 def split_document_sections_into_fragments(ctx):
