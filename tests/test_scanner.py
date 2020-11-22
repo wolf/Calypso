@@ -103,6 +103,16 @@ def test_consecutive_section_includes(shared_context):
     assert code_files["generated_output"] == read_golden_record("tests/data/test-consecutive-section-includes")
 
 
+def test_consecutive_section_includes_dont_drop_indent(shared_context):
+    scanner.parse_source_file(
+        shared_context, ":memory:", Path("tests/data/test-consecutive-section-includes-dont-drop-indent.w")
+    )
+    code_files = scanner.get_code_files(shared_context)
+    assert code_files["generated_output"] == read_golden_record(
+        "tests/data/test-consecutive-section-includes-dont-drop-indent"
+    )
+
+
 def test_indentation_is_preserved(shared_context):
     scanner.parse_source_file(shared_context, ":memory:", Path("tests/data/test-indentation-is-preserved.w"))
     code_files = scanner.get_code_files(shared_context)
