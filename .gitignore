@@ -114,9 +114,12 @@ tags
 # End of https://www.toptal.com/developers/gitignore/api/pycharm+all,vim
 
 *.out
-.venv/
+blue.venv/
 *.egg-info/
 generated_output
 samples/
 archives/
 output/
+play/
+w/
+sample.sqlite
