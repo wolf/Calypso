@@ -10,9 +10,9 @@
       <<C>>)))
 <<B>>=
 ([is-multiple-of-3 (zero? (modulo i 3))]
- [is-multiple-of-5 (zero? (modulo i 5))])
+          [is-multiple-of-5 (zero? (modulo i 5))])
 <<C>>=
 (newline)
 <<D>>=
 is-multiple-of-5
-  (write 'Buzz)
+        (write 'Buzz)

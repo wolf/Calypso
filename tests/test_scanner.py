@@ -103,7 +103,7 @@ def test_consecutive_section_includes(shared_context):
     assert code_files["generated_output"] == read_golden_record("tests/data/test-consecutive-section-includes")
 
 
-def test_consecutive_section_includes_dont_drop_indent(shared_context):
+def test_inner_whitespace_is_not_indent(shared_context):
     scanner.parse_source_file(
         shared_context, ":memory:", Path("tests/data/test-inner-whitespace-is-not-indent.w")
     )
